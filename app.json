@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "Streeplijst",
+    "slug": "streeplijst",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "streeplijst",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "nl.scoutingjwf.streeplijst"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#2EA0B2",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "nl.scoutingjwf.streeplijst",
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Streeplijst gebruikt de camera alleen om de QR-code te scannen waarmee je een gedeelde lijst opent.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#2EA0B2",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200
+        }
+      ],
+      "expo-sharing"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "980bc886-c437-4e7e-b546-acf656335999"
+      }
+    }
+  }
+}
