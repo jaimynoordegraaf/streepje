@@ -27,6 +27,7 @@ create table if not exists public.session_people (
   session_id  text not null references public.sessions(id) on delete cascade,
   name        text not null,
   paid        boolean not null default false,
+  paid_cents  integer not null default 0,
   paid_at     timestamptz
 );
 

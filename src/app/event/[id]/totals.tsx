@@ -6,13 +6,18 @@ import { Text } from '@/components/text';
 
 import { Button, Card, EmptyState, Screen, useBottomInset } from '@/components/ui';
 import { describeError } from '@/lib/errors';
-import { exportCsv, formatDateTime, shareSummary } from '@/lib/export';
+import { PromptModal } from '@/components/modals';
+import { exportCsv, formatDateTime, sharePersonRequest, shareSummary } from '@/lib/export';
+import { parsePrice } from '@/lib/money';
 import { formatCents } from '@/lib/money';
 import { useEvent, useStore } from '@/lib/store';
+import type { Person } from '@/lib/types';
 import {
   correctionCount,
   corrections,
   deviceLabel,
+  isSettled,
+  personOutstandingCents,
   eventOutstandingCents,
   eventPaidCents,
   eventTotalCents,
@@ -25,7 +30,8 @@ export default function TotalsScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const event = useEvent(id);
-  const setPersonPaid = useStore((state) => state.setPersonPaid);
+  const setPersonPayment = useStore((state) => state.setPersonPayment);
+  const [payingPerson, setPayingPerson] = useState<Person | null>(null);
   const deviceId = useStore((state) => state.deviceId);
   const deviceName = useStore((state) => state.deviceName);
   const [busy, setBusy] = useState(false);
@@ -113,6 +119,8 @@ export default function TotalsScreen() {
           const lines = personLines(event, person.id);
           const personTotal = personTotalCents(event, person.id);
           const removed = corrections(event, person.id);
+          const settled = isSettled(event, person);
+          const outstanding = personOutstandingCents(event, person);
 
           return (
             <Card style={{ gap: space.sm }}>
@@ -165,27 +173,74 @@ export default function TotalsScreen() {
                 </View>
               ) : null}
 
+              {person.paidCents > 0 && !settled ? (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ color: theme.good, fontSize: 13, fontWeight: '600' }}>
+                    {formatCents(person.paidCents)} betaald
+                  </Text>
+                  <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '600' }}>
+                    {formatCents(outstanding)} open
+                  </Text>
+                </View>
+              ) : null}
+
               <Pressable
-                onPress={() => setPersonPaid(id, person.id, !person.paid)}
+                onPress={() =>
+                  setPersonPayment(id, person.id, settled ? 0 : personTotal)
+                }
                 style={({ pressed }) => ({
                   marginTop: space.xs,
                   paddingVertical: 10,
                   borderRadius: radius.md,
                   alignItems: 'center',
-                  backgroundColor: person.paid ? theme.good : theme.chip,
+                  backgroundColor: settled ? theme.good : theme.chip,
                   opacity: pressed ? 0.75 : 1,
                 })}>
                 <Text
                   style={{
-                    color: person.paid ? theme.onGood : theme.text,
+                    color: settled ? theme.onGood : theme.text,
                     fontWeight: '700',
                     fontSize: 14,
                   }}>
-                  {person.paid ? 'Betaald ✓  (tik om ongedaan te maken)' : 'Markeer als betaald'}
+                  {settled ? 'Betaald ✓  (tik om ongedaan te maken)' : 'Markeer als betaald'}
                 </Text>
               </Pressable>
+
+              {!settled ? (
+                <View style={{ flexDirection: 'row', gap: space.sm }}>
+                  <Button
+                    title="Deelbetaling"
+                    variant="secondary"
+                    onPress={() => setPayingPerson(person)}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    title="Vraag betaling"
+                    variant="secondary"
+                    onPress={() => sharePersonRequest(event, person).catch(() => {})}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              ) : null}
             </Card>
           );
+        }}
+      />
+
+      <PromptModal
+        visible={payingPerson !== null}
+        title={payingPerson ? `Betaling van ${payingPerson.name}` : 'Betaling'}
+        placeholder="Bedrag, bijv. 10,00"
+        submitLabel="Vastleggen"
+        onCancel={() => setPayingPerson(null)}
+        onSubmit={(value) => {
+          const amount = parsePrice(value);
+          if (payingPerson && amount !== null) {
+            // Added to what was already handed over, since a part payment
+            // follows an earlier one rather than replacing it.
+            setPersonPayment(id, payingPerson.id, payingPerson.paidCents + amount);
+          }
+          setPayingPerson(null);
         }}
       />
     </Screen>

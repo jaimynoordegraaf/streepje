@@ -14,6 +14,7 @@ import {
   eventOutstandingCents,
   eventPaidCents,
   eventTotalCents,
+  isSettled,
   personItemCount,
   personTotalCents,
 } from '@/lib/totals';
@@ -221,7 +222,7 @@ export default function EventScreen() {
                     </Text>
                   </View>
 
-                  {person.paid ? (
+                  {isSettled(event, person) ? (
                     <View
                       style={{
                         paddingHorizontal: space.sm,

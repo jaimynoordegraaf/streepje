@@ -14,6 +14,8 @@
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
+import { isSettled } from './totals';
+
 import type { AppEvent, Category, MenuItem, OrderEntry, Person, SessionMember } from './types';
 import { ensureSignedIn, supabase } from './supabase';
 
@@ -21,7 +23,9 @@ type PersonRow = {
   id: string;
   session_id: string;
   name: string;
+  /** Kept in step for older clients; paid_cents is what counts. */
   paid: boolean;
+  paid_cents: number;
   paid_at: string | null;
 };
 type ItemRow = {
@@ -47,15 +51,16 @@ type EntryRow = {
 const toPerson = (row: PersonRow): Person => ({
   id: row.id,
   name: row.name,
-  paid: row.paid,
+  paidCents: row.paid_cents ?? 0,
   paidAt: row.paid_at ? Date.parse(row.paid_at) : null,
 });
 
-const fromPerson = (sessionId: string, person: Person): PersonRow => ({
+const fromPerson = (sessionId: string, person: Person, settled: boolean): PersonRow => ({
   id: person.id,
   session_id: sessionId,
   name: person.name,
-  paid: person.paid,
+  paid: settled,
+  paid_cents: person.paidCents,
   paid_at: person.paidAt ? new Date(person.paidAt).toISOString() : null,
 });
 
@@ -270,7 +275,9 @@ export async function pushDetails(event: AppEvent): Promise<void> {
   const results = await Promise.all([
     db.from('sessions').update({ name: event.name, closed: event.closed }).eq('id', event.id),
     event.people.length
-      ? db.from('session_people').upsert(event.people.map((p) => fromPerson(event.id, p)))
+      ? db
+          .from('session_people')
+          .upsert(event.people.map((p) => fromPerson(event.id, p, isSettled(event, p))))
       : Promise.resolve({ error: null }),
     event.menu.length
       ? db.from('session_items').upsert(event.menu.map((i) => fromItem(event.id, i)))

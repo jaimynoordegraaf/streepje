@@ -27,8 +27,16 @@ export type SavedPerson = {
 export type Person = {
   id: string;
   name: string;
-  paid: boolean;
-  /** When they paid, as a timestamp in milliseconds. Null while unpaid. */
+  /**
+   * How much has actually been handed over, in cents.
+   *
+   * An amount rather than a yes/no, because people pay round numbers against
+   * odd totals -- ten euro against thirteen fifty. Whether someone is settled
+   * is worked out from this and what they owe, not stored, so ordering another
+   * drink after paying correctly reopens the difference.
+   */
+  paidCents: number;
+  /** When money was last taken from them. Null if none has been. */
   paidAt: number | null;
 };
 

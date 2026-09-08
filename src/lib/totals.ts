@@ -6,7 +6,7 @@
  * entries rather than a number someone remembered to keep up to date.
  */
 
-import type { AppEvent, MenuItem, OrderEntry } from './types';
+import type { AppEvent, MenuItem, OrderEntry, Person } from './types';
 
 export type Line = {
   item: MenuItem;
@@ -73,16 +73,29 @@ export function eventTotalCents(event: AppEvent): number {
   return event.people.reduce((sum, person) => sum + personTotalCents(event, person.id), 0);
 }
 
-/** Money already collected. */
-export function eventPaidCents(event: AppEvent): number {
-  return event.people
-    .filter((person) => person.paid)
-    .reduce((sum, person) => sum + personTotalCents(event, person.id), 0);
+/** What one person still owes. Never negative: overpaying is not a debt. */
+export function personOutstandingCents(event: AppEvent, person: Person): number {
+  return Math.max(0, personTotalCents(event, person.id) - person.paidCents);
 }
 
-/** Money still to come in. */
+/** Settled when nothing is left owing, which changes again if they order more. */
+export function isSettled(event: AppEvent, person: Person): boolean {
+  return personOutstandingCents(event, person) === 0;
+}
+
+/** Money actually collected. */
+export function eventPaidCents(event: AppEvent): number {
+  return event.people.reduce((sum, person) => sum + person.paidCents, 0);
+}
+
+/**
+ * Money still to come in.
+ *
+ * Summed per person rather than taken from the grand total, so someone who
+ * overpaid cannot quietly cancel out what somebody else still owes.
+ */
 export function eventOutstandingCents(event: AppEvent): number {
-  return eventTotalCents(event) - eventPaidCents(event);
+  return event.people.reduce((sum, person) => sum + personOutstandingCents(event, person), 0);
 }
 
 /**

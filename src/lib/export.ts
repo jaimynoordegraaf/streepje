@@ -16,6 +16,8 @@ import {
   correctionCount,
   corrections,
   deviceLabel,
+  isSettled,
+  personOutstandingCents,
   type LocalDevice,
   eventOutstandingCents,
   eventPaidCents,
@@ -24,7 +26,7 @@ import {
   personLines,
   personTotalCents,
 } from './totals';
-import type { AppEvent } from './types';
+import type { AppEvent, Person } from './types';
 
 /**
  * Excel on some systems (notably Dutch/German Windows) expects a semicolon
@@ -93,14 +95,15 @@ export function buildCsv(event: AppEvent, local?: LocalDevice): string {
   rows.push('');
 
   rows.push(csvRow(['OVERZICHT']));
-  rows.push(csvRow(['Persoon', 'Consumpties', 'Totaal', 'Betaald', 'Betaald op']));
+  rows.push(csvRow(['Persoon', 'Consumpties', 'Totaal', 'Betaald', 'Openstaand', 'Betaald op']));
   for (const person of event.people) {
     rows.push(
       csvRow([
         person.name,
         personItemCount(event, person.id),
         centsToPlainNumber(personTotalCents(event, person.id)),
-        person.paid ? 'ja' : 'nee',
+        centsToPlainNumber(person.paidCents),
+        centsToPlainNumber(personOutstandingCents(event, person)),
         person.paidAt ? formatDateTime(person.paidAt) : '',
       ])
     );
@@ -148,7 +151,12 @@ export function buildSummaryText(event: AppEvent): string {
     const detail = personLines(event, person.id)
       .map((line) => `${line.quantity}x ${line.item.name}`)
       .join(', ');
-    const status = person.paid ? ' (betaald)' : '';
+    const outstanding = personOutstandingCents(event, person);
+    const status = isSettled(event, person)
+      ? ' (betaald)'
+      : person.paidCents > 0
+        ? ` (${formatCents(person.paidCents)} betaald, ${formatCents(outstanding)} open)`
+        : '';
     lines.push(`${person.name}: ${formatCents(total)}${status}`);
     if (detail) lines.push(`   ${detail}`);
   }
@@ -160,6 +168,38 @@ export function buildSummaryText(event: AppEvent): string {
   const removedCount = correctionCount(event);
   if (removedCount > 0) {
     lines.push(`Weggehaald: ${removedCount} ${removedCount === 1 ? 'turfje' : 'turfjes'}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * A short message for one person, to send them by WhatsApp or alongside a
+ * payment request.
+ *
+ * Deliberately just their own line rather than the whole event: what someone
+ * needs in order to pay is what they owe and what it was for, and sending them
+ * everybody else's totals is nobody's business.
+ */
+export function buildPersonRequest(event: AppEvent, person: Person): string {
+  const outstanding = personOutstandingCents(event, person);
+  const lines = [`Hoi ${person.name},`, ''];
+
+  if (outstanding === 0) {
+    lines.push(`Je staat gelijk voor ${event.name}. Bedankt!`);
+    return lines.join('\n');
+  }
+
+  lines.push(`Je hebt nog ${formatCents(outstanding)} open van ${event.name}.`);
+
+  const detail = personLines(event, person.id)
+    .map((line) => `${line.quantity}x ${line.item.name}`)
+    .join(', ');
+  if (detail) lines.push(detail);
+
+  if (person.paidCents > 0) {
+    lines.push('');
+    lines.push(`(${formatCents(personTotalCents(event, person.id))} totaal, ${formatCents(person.paidCents)} al betaald)`);
   }
 
   return lines.join('\n');
@@ -200,6 +240,11 @@ export async function exportCsv(event: AppEvent): Promise<void> {
     dialogTitle: `Exporteren: ${event.name}`,
     UTI: 'public.comma-separated-values-text',
   });
+}
+
+/** Send one person their own amount. */
+export async function sharePersonRequest(event: AppEvent, person: Person): Promise<void> {
+  await Share.share({ message: buildPersonRequest(event, person) });
 }
 
 /** Share the short readable version as plain text. */

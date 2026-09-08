@@ -99,7 +99,8 @@ type StoreState = {
   addUnknownPerson: (eventId: string) => string;
   renamePerson: (eventId: string, personId: string, name: string) => void;
   removePerson: (eventId: string, personId: string) => void;
-  setPersonPaid: (eventId: string, personId: string, paid: boolean) => void;
+  /** Record the total handed over so far. Pass 0 to undo a payment. */
+  setPersonPayment: (eventId: string, personId: string, paidCents: number) => void;
 
   addItem: (eventId: string, draft: Omit<MenuItem, 'id'>) => void;
   updateItem: (eventId: string, itemId: string, patch: Partial<Omit<MenuItem, 'id'>>) => void;
@@ -184,7 +185,7 @@ export const useStore = create<StoreState>()(
             const person: Person = {
               id: newId(),
               name: name.trim() || 'Iemand',
-              paid: false,
+              paidCents: 0,
               paidAt: null,
             };
             return { ...event, people: [...event.people, person] };
@@ -198,7 +199,7 @@ export const useStore = create<StoreState>()(
             const fresh = names
               .map((name) => name.trim())
               .filter((name) => name !== '' && !taken.has(name.toLowerCase()))
-              .map((name) => ({ id: newId(), name, paid: false, paidAt: null }));
+              .map((name) => ({ id: newId(), name, paidCents: 0, paidAt: null }));
             return { ...event, people: [...event.people, ...fresh] };
           }),
         }),
@@ -213,7 +214,7 @@ export const useStore = create<StoreState>()(
             const person: Person = {
               id,
               name: `Onbekend ${used.length + 1}`,
-              paid: false,
+              paidCents: 0,
               paidAt: null,
             };
             return { ...event, people: [...event.people, person] };
@@ -248,13 +249,17 @@ export const useStore = create<StoreState>()(
           }),
         }),
 
-      setPersonPaid: (eventId, personId, paid) =>
+      setPersonPayment: (eventId, personId, paidCents) =>
         set({
           events: mapEvent(get().events, eventId, (event) => ({
             ...event,
             people: event.people.map((person) =>
               person.id === personId
-                ? { ...person, paid, paidAt: paid ? Date.now() : null }
+                ? {
+                    ...person,
+                    paidCents: Math.max(0, Math.round(paidCents)),
+                    paidAt: paidCents > 0 ? Date.now() : null,
+                  }
                 : person
             ),
           })),
@@ -400,7 +405,7 @@ export const useStore = create<StoreState>()(
     {
       name: 'turf-store-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 5,
+      version: 6,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -473,6 +478,35 @@ export const useStore = create<StoreState>()(
               deviceName: entry.deviceName ?? null,
             })),
           }));
+        }
+
+        if (fromVersion < 6) {
+          // "paid" was a flag; it becomes the amount that was owed at the time,
+          // which is what that flag actually meant.
+          state.events = (state.events ?? []).map((event: any) => {
+            const price = new Map<string, number>(
+              (event.menu ?? []).map((item: MenuItem) => [item.id, item.priceCents])
+            );
+            const owed = (personId: string) =>
+              (event.entries ?? [])
+                .filter((entry: OrderEntry) => entry.personId === personId)
+                .reduce(
+                  (sum: number, entry: OrderEntry) =>
+                    sum + entry.delta * (price.get(entry.itemId) ?? 0),
+                  0
+                );
+
+            return {
+              ...event,
+              people: (event.people ?? []).map((person: any) => {
+                const { paid, ...rest } = person;
+                return {
+                  ...rest,
+                  paidCents: person.paidCents ?? (paid ? Math.max(0, owed(person.id)) : 0),
+                };
+              }),
+            };
+          });
         }
 
         return state;
