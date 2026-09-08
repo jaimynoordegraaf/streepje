@@ -2,7 +2,7 @@
 
 Until you do this, the app works exactly as before: everything stays on one
 phone, and the Share screen explains that sharing is not set up. Nothing here
-is needed to keep using Streeplijst on its own.
+is needed to keep using streepje on its own.
 
 You need to do this once. Steps 1-3 are things only you can do -- they involve
 creating an account, which I can't do on your behalf.

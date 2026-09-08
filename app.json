@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Streeplijst",
-    "slug": "streeplijst",
+    "name": "streepje",
+    "slug": "streepje",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "streeplijst",
+    "scheme": "streepje",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "nl.scoutingjwf.streeplijst"
+      "bundleIdentifier": "nl.scoutingjwf.streepje"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "nl.scoutingjwf.streeplijst",
+      "package": "nl.scoutingjwf.streepje",
       "permissions": [
         "android.permission.CAMERA"
       ]
@@ -32,7 +32,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Streeplijst gebruikt de camera alleen om de QR-code te scannen waarmee je een gedeelde lijst opent.",
+          "cameraPermission": "streepje gebruikt de camera alleen om de QR-code te scannen waarmee je een gedeelde lijst opent.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }

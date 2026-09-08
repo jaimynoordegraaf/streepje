@@ -39,7 +39,7 @@ export default function JoinScreen() {
     const code = codeFrom(rawValue);
     if (!code) {
       handled.current = false;
-      Alert.alert('Geen Streeplijst-code', 'Deze code lijkt geen sessiecode te zijn.');
+      Alert.alert('Geen streepje-code', 'Deze code lijkt geen sessiecode te zijn.');
       return;
     }
 

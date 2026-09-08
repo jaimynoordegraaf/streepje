@@ -1,4 +1,4 @@
-# Streeplijst
+# streepje
 
 Turf wie wat gedronken en gegeten heeft op een evenement, en wie er aan het eind
 nog moet betalen.

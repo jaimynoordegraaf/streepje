@@ -12,7 +12,7 @@ import { useEventSync } from '@/lib/use-sync';
 import { radius, space, useTheme } from '@/theme';
 
 /** What a joining phone reads out of the QR. */
-export const joinUrlFor = (code: string) => `streeplijst://join?code=${code}`;
+export const joinUrlFor = (code: string) => `streepje://join?code=${code}`;
 
 export default function ShareScreen() {
   const theme = useTheme();

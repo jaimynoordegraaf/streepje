@@ -178,7 +178,7 @@ function slugify(name: string): string {
  * it can go to Drive, Gmail, WhatsApp, or anywhere else you pick.
  */
 export async function exportCsv(event: AppEvent): Promise<void> {
-  const filename = `streeplijst-${slugify(event.name)}-${formatDate(event.createdAt)}.csv`;
+  const filename = `streepje-${slugify(event.name)}-${formatDate(event.createdAt)}.csv`;
   const file = new File(Paths.cache, filename);
 
   if (file.exists) file.delete();
