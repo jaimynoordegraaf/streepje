@@ -5,6 +5,7 @@ import { Alert, FlatList, Pressable, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { Button, Card, EmptyState, Screen, useBottomInset } from '@/components/ui';
+import { describeError } from '@/lib/errors';
 import { exportCsv, formatDateTime, shareSummary } from '@/lib/export';
 import { formatCents } from '@/lib/money';
 import { useEvent, useStore } from '@/lib/store';
@@ -47,7 +48,7 @@ export default function TotalsScreen() {
     try {
       await action();
     } catch (error) {
-      Alert.alert('Exporteren mislukt', error instanceof Error ? error.message : String(error));
+      Alert.alert('Exporteren mislukt', describeError(error));
     } finally {
       setBusy(false);
     }

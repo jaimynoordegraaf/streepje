@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, View } from 'react-native';
 import { PromptModal } from '@/components/modals';
 import { Text } from '@/components/text';
 import { Button, Card, Field, Screen, useBottomInset } from '@/components/ui';
+import { describeError } from '@/lib/errors';
 import { useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
 import { fetchSession, joinSession, setMemberName } from '@/lib/sync';
@@ -81,7 +82,7 @@ export default function JoinScreen() {
       router.replace({ pathname: '/event/[id]', params: { id: sessionId } });
     } catch (error) {
       handled.current = false;
-      Alert.alert('Deelnemen mislukt', error instanceof Error ? error.message : String(error));
+      Alert.alert('Deelnemen mislukt', describeError(error));
     } finally {
       setBusy(false);
     }

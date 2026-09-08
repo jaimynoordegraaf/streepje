@@ -6,6 +6,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { Text } from '@/components/text';
 import { PromptModal } from '@/components/modals';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
+import { describeError } from '@/lib/errors';
 import { newJoinCode, useEvent, useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
 import { hostSession, setMemberName } from '@/lib/sync';
@@ -41,8 +42,8 @@ export default function ShareScreen() {
   const startSharing = async (hostName: string) => {
     setBusy(true);
     try {
-      const joinCode = newJoinCode();
-      await hostSession(event, joinCode);
+      // May differ from the code we proposed, if the event was already online.
+      const joinCode = await hostSession(event, newJoinCode());
       setShare(id, { joinCode, role: 'host', lastSyncedAt: Date.now() });
       setDeviceName(hostName);
       // Without this the host would be the one phone missing from its own list.
@@ -50,7 +51,7 @@ export default function ShareScreen() {
     } catch (error) {
       Alert.alert(
         'Delen starten mislukt',
-        error instanceof Error ? error.message : String(error)
+        describeError(error)
       );
     } finally {
       setBusy(false);

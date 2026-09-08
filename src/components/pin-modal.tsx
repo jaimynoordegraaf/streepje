@@ -18,6 +18,7 @@ import {
   noteWrongPin,
   verifyPin,
 } from '@/lib/pin';
+import { describeError } from '@/lib/errors';
 import type { PinRecord } from '@/lib/types';
 import { radius, space, useTheme } from '@/theme';
 
@@ -119,7 +120,7 @@ export function PinModal({
       } catch (failure) {
         // Hashing runs in native code and can fail. Say so, rather than
         // leaving the dialog sitting there with a button that does nothing.
-        setError('Opslaan mislukt: ' + (failure instanceof Error ? failure.message : String(failure)));
+        setError('Opslaan mislukt: ' + (describeError(failure)));
       } finally {
         setBusy(false);
       }
@@ -136,7 +137,7 @@ export function PinModal({
       ok = await verifyPin(first, record);
     } catch (failure) {
       setBusy(false);
-      setError('Controle mislukt: ' + (failure instanceof Error ? failure.message : String(failure)));
+      setError('Controle mislukt: ' + (describeError(failure)));
       return;
     }
     setBusy(false);

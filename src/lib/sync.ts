@@ -112,8 +112,14 @@ function client() {
 
 // ------------------------------------------------------------ operations ---
 
-/** Publish a local event so other devices can join it. */
-export async function hostSession(event: AppEvent, joinCode: string): Promise<void> {
+/**
+ * Publish a local event so other devices can join it.
+ *
+ * Returns the join code actually in use, which is not always the one asked
+ * for: an event can already be online, and then its existing code is the one
+ * that works.
+ */
+export async function hostSession(event: AppEvent, joinCode: string): Promise<string> {
   await ensureSignedIn();
   const db = client();
 
@@ -122,10 +128,42 @@ export async function hostSession(event: AppEvent, joinCode: string): Promise<vo
     p_join_code: joinCode,
     p_name: event.name,
   });
-  if (error) throw error;
+
+  if (error) {
+    const duplicate = (error as { code?: string }).code === '23505';
+    const message = typeof error.message === 'string' ? error.message : '';
+
+    if (duplicate && message.includes('sessions_pkey')) {
+      // The event is already published. This happens when an earlier attempt
+      // created the row and then failed further on, and when sharing was
+      // stopped on this phone, which deliberately leaves the shared copy in
+      // place. Carrying on with the existing copy is right in both cases;
+      // failing would strand the event permanently, since every retry would
+      // hit the same collision.
+      const { data, error: readError } = await db
+        .from('sessions')
+        .select('join_code')
+        .eq('id', event.id)
+        .maybeSingle();
+
+      if (readError) throw readError;
+      if (!data) {
+        throw new Error(
+          'Dit evenement staat al online, maar deze telefoon heeft er geen toegang meer toe. Maak een nieuw evenement aan en turf daarin verder.'
+        );
+      }
+
+      await pushDetails(event);
+      await pushEntries(event.id, event.entries);
+      return data.join_code as string;
+    }
+
+    throw error;
+  }
 
   await pushDetails(event);
   await pushEntries(event.id, event.entries);
+  return joinCode;
 }
 
 /** Join someone else's session using the code from their QR. */
