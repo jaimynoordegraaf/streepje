@@ -26,6 +26,8 @@ export default function TotalsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const event = useEvent(id);
   const setPersonPaid = useStore((state) => state.setPersonPaid);
+  const deviceId = useStore((state) => state.deviceId);
+  const deviceName = useStore((state) => state.deviceName);
   const [busy, setBusy] = useState(false);
   const bottomInset = useBottomInset();
 
@@ -157,7 +159,7 @@ export default function TotalsScreen() {
                     <Text key={entry.id} style={{ color: theme.textDim, fontSize: 12 }}>
                       {formatDateTime(entry.createdAt)} · {-entry.delta}×{' '}
                       {event.menu.find((item) => item.id === entry.itemId)?.name ?? 'onbekend'} ·{' '}
-                      {deviceLabel(entry)}
+                      {deviceLabel(entry, { deviceId, deviceName })}
                     </Text>
                   ))}
                 </View>

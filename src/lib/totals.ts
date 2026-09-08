@@ -104,15 +104,32 @@ export function correctionCount(event: AppEvent): number {
   return corrections(event).reduce((sum, entry) => sum - entry.delta, 0);
 }
 
+/** Who this phone is, so its own older entries can still be recognised. */
+export type LocalDevice = {
+  deviceId: string;
+  deviceName: string | null;
+};
+
 /**
  * How to name the phone that logged an entry, for someone reading the record.
  *
- * The name is whatever that phone called itself at the time. Entries from
- * before naming existed, or from a phone that never shared, fall back to a
- * short form of the device id -- meaningless on its own, but still enough to
- * tell two phones apart in a list.
+ * Normally this is the name that phone carried at the time, copied onto the
+ * entry when it was written, so a later rename cannot revise history.
+ *
+ * Entries written before naming existed carry nothing. Where such an entry
+ * came from the phone doing the reading, its current name is used instead:
+ * inferred rather than recorded, but far more use than a fragment of an id.
+ * Anything else falls back to that fragment, which at least tells two phones
+ * apart.
  */
-export function deviceLabel(entry: OrderEntry): string {
+export function deviceLabel(entry: OrderEntry, local?: LocalDevice): string {
   if (entry.deviceName && entry.deviceName.trim() !== '') return entry.deviceName;
+
+  if (local && entry.deviceId === local.deviceId) {
+    return local.deviceName && local.deviceName.trim() !== ''
+      ? local.deviceName
+      : 'deze telefoon';
+  }
+
   return `telefoon ${entry.deviceId.slice(0, 6)}`;
 }

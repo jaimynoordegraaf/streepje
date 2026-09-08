@@ -11,10 +11,12 @@ import * as Sharing from 'expo-sharing';
 import { Share } from 'react-native';
 
 import { centsToPlainNumber, formatCents } from './money';
+import { useStore } from './store';
 import {
   correctionCount,
   corrections,
   deviceLabel,
+  type LocalDevice,
   eventOutstandingCents,
   eventPaidCents,
   eventTotalCents,
@@ -59,7 +61,7 @@ export function formatDateTime(timestamp: number): string {
   return `${formatDate(timestamp)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function buildCsv(event: AppEvent): string {
+export function buildCsv(event: AppEvent, local?: LocalDevice): string {
   const rows: string[] = [];
 
   rows.push(csvRow(['Evenement', event.name]));
@@ -129,7 +131,7 @@ export function buildCsv(event: AppEvent): string {
           personName(entry.personId),
           itemName(entry.itemId),
           -entry.delta,
-          deviceLabel(entry),
+          deviceLabel(entry, local),
         ])
       );
     }
@@ -179,6 +181,7 @@ function slugify(name: string): string {
  * it can go to Drive, Gmail, WhatsApp, or anywhere else you pick.
  */
 export async function exportCsv(event: AppEvent): Promise<void> {
+  const local = { deviceId: useStore.getState().deviceId, deviceName: useStore.getState().deviceName };
   const filename = `streepje-${slugify(event.name)}-${formatDate(event.createdAt)}.csv`;
   const file = new File(Paths.cache, filename);
 
