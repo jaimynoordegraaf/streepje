@@ -11,9 +11,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useStore } from './store';
-import { isSyncConfigured } from './supabase';
-import { fetchSession, pushDetails, pushEntries, subscribeToSession } from './sync';
-import type { AppEvent } from './types';
+import { ensureSignedIn, isSyncConfigured } from './supabase';
+import { fetchMembers, fetchSession, pushDetails, pushEntries, subscribeToSession } from './sync';
+import type { AppEvent, SessionMember } from './types';
 
 export type SyncStatus = 'off' | 'connecting' | 'live' | 'offline';
 
@@ -134,4 +134,57 @@ export function useEventSync(event: AppEvent | undefined) {
   }, [status, retry]);
 
   return { status, pending, retry };
+}
+
+/**
+ * The phones taking part in a shared event.
+ *
+ * Rides on the same realtime connection as the rest of the sync, so opening
+ * the sharing screen does not open a second socket. Empty for an event that is
+ * not shared.
+ */
+export function useSessionMembers(event: AppEvent | undefined): {
+  members: SessionMember[];
+  /** This phone's own id, so the list can point out which row is you. */
+  meId: string | null;
+} {
+  const [members, setMembers] = useState<SessionMember[]>([]);
+  const [meId, setMeId] = useState<string | null>(null);
+
+  const eventId = event?.id;
+  const shared = Boolean(event?.share) && isSyncConfigured;
+
+  useEffect(() => {
+    if (!shared || !eventId) {
+      setMembers([]);
+      return;
+    }
+
+    let cancelled = false;
+    const load = () => {
+      fetchMembers(eventId)
+        .then((next) => {
+          if (!cancelled) setMembers(next);
+        })
+        .catch(() => {
+          // Offline is not an error worth shouting about here; the list simply
+          // stays as it was until the connection comes back.
+        });
+    };
+
+    load();
+    ensureSignedIn()
+      .then((id) => {
+        if (!cancelled) setMeId(id);
+      })
+      .catch(() => {});
+    const unsubscribe = subscribeToSession(eventId, { onMembersChanged: load });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [shared, eventId]);
+
+  return { members, meId };
 }

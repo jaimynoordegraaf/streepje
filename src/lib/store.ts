@@ -61,6 +61,12 @@ function pruneEntries(entries: OrderEntry[], personIds: string[], itemIds: strin
 type StoreState = {
   /** Identifies this phone in the order log. Generated once, then kept. */
   deviceId: string;
+  /**
+   * What this phone last called itself when joining a shared event, used to
+   * prefill the prompt next time. Absent on installs from before naming
+   * existed, which the persist merge handles by falling back to null.
+   */
+  deviceName: string | null;
   events: AppEvent[];
   /** The menu that newly created events start from. */
   defaultMenu: MenuItem[];
@@ -88,6 +94,7 @@ type StoreState = {
 
   // --- used by the sync engine -------------------------------------------
 
+  setDeviceName: (name: string) => void;
   setShare: (eventId: string, share: ShareInfo | null) => void;
   /** Set or replace the PIN that guards removing a turf. */
   setCorrectionPin: (eventId: string, pin: PinRecord | null) => void;
@@ -108,6 +115,7 @@ export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
       deviceId: newId(),
+      deviceName: null,
       events: [],
       defaultMenu: withIds(STARTER_MENU),
 
@@ -259,6 +267,8 @@ export const useStore = create<StoreState>()(
 
       removeDefaultItem: (itemId) =>
         set({ defaultMenu: get().defaultMenu.filter((item) => item.id !== itemId) }),
+
+      setDeviceName: (deviceName) => set({ deviceName: deviceName.trim() || null }),
 
       setShare: (eventId, share) =>
         set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, share })) }),

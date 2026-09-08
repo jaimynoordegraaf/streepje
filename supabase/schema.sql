@@ -17,6 +17,7 @@ create table if not exists public.sessions (
 create table if not exists public.session_members (
   session_id  text not null references public.sessions(id) on delete cascade,
   user_id     uuid not null,
+  name        text,
   joined_at   timestamptz not null default now(),
   primary key (session_id, user_id)
 );
@@ -121,7 +122,12 @@ create policy sessions_rw on public.sessions
 
 drop policy if exists members_read on public.session_members;
 create policy members_read on public.session_members
-  for select using (user_id = auth.uid());
+  for select using (public.is_member(session_id));
+
+-- A device may name itself, and only itself.
+drop policy if exists members_name_own on public.session_members;
+create policy members_name_own on public.session_members
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 drop policy if exists people_rw on public.session_people;
 create policy people_rw on public.session_people
@@ -146,7 +152,8 @@ create policy entries_insert on public.order_entries
 
 -- ------------------------------------------------------------- realtime ----
 
-alter table public.sessions       replica identity full;
+alter table public.sessions        replica identity full;
+alter table public.session_members replica identity full;
 alter table public.session_people replica identity full;
 alter table public.session_items  replica identity full;
 alter table public.order_entries  replica identity full;
@@ -154,6 +161,7 @@ alter table public.order_entries  replica identity full;
 do $$
 begin
   alter publication supabase_realtime add table public.sessions;
+  alter publication supabase_realtime add table public.session_members;
   alter publication supabase_realtime add table public.session_people;
   alter publication supabase_realtime add table public.session_items;
   alter publication supabase_realtime add table public.order_entries;

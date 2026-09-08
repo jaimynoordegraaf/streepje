@@ -14,7 +14,7 @@
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
-import type { AppEvent, Category, MenuItem, OrderEntry, Person } from './types';
+import type { AppEvent, Category, MenuItem, OrderEntry, Person, SessionMember } from './types';
 import { ensureSignedIn, supabase } from './supabase';
 
 type PersonRow = {
@@ -92,6 +92,19 @@ const fromEntry = (sessionId: string, entry: OrderEntry): EntryRow => ({
   created_at: new Date(entry.createdAt).toISOString(),
 });
 
+type MemberRow = {
+  session_id: string;
+  user_id: string;
+  name: string | null;
+  joined_at: string;
+};
+
+const toMember = (row: MemberRow): SessionMember => ({
+  userId: row.user_id,
+  name: row.name,
+  joinedAt: Date.parse(row.joined_at),
+});
+
 function client() {
   if (!supabase) throw new Error('Delen is niet ingesteld in deze versie.');
   return supabase;
@@ -160,6 +173,35 @@ export async function fetchSession(sessionId: string): Promise<RemoteSession> {
   };
 }
 
+/** Who is taking part, oldest first. */
+export async function fetchMembers(sessionId: string): Promise<SessionMember[]> {
+  const db = client();
+  const { data, error } = await db
+    .from('session_members')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('joined_at');
+  if (error) throw error;
+  return (data ?? []).map(toMember);
+}
+
+/**
+ * Name this phone within a session.
+ *
+ * A device may only rename itself; the database enforces that, so there is no
+ * need to trust the client's filter here.
+ */
+export async function setMemberName(sessionId: string, name: string): Promise<void> {
+  const userId = await ensureSignedIn();
+  const db = client();
+  const { error } = await db
+    .from('session_members')
+    .update({ name: name.trim() })
+    .eq('session_id', sessionId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
 /**
  * Send order rows.
  *
@@ -199,8 +241,10 @@ export async function pushDetails(event: AppEvent): Promise<void> {
 }
 
 type Handlers = {
-  onEntry: (entry: OrderEntry) => void;
-  onDetailsChanged: () => void;
+  onEntry?: (entry: OrderEntry) => void;
+  onDetailsChanged?: () => void;
+  /** Fires when a phone joins or renames itself. */
+  onMembersChanged?: () => void;
 };
 
 /**
@@ -220,7 +264,8 @@ export function subscribeToSession(sessionId: string, handlers: Handlers): () =>
     const db = client();
     const listeners = new Set<Handlers>();
     const filter = `session_id=eq.${sessionId}`;
-    const announce = () => listeners.forEach((listener) => listener.onDetailsChanged());
+    const announce = () => listeners.forEach((listener) => listener.onDetailsChanged?.());
+    const announceMembers = () => listeners.forEach((listener) => listener.onMembersChanged?.());
 
     const channel = db
       .channel(`turf:${sessionId}`)
@@ -229,7 +274,7 @@ export function subscribeToSession(sessionId: string, handlers: Handlers): () =>
         { event: 'INSERT', schema: 'public', table: 'order_entries', filter },
         (payload) => {
           const entry = toEntry(payload.new as EntryRow);
-          listeners.forEach((listener) => listener.onEntry(entry));
+          listeners.forEach((listener) => listener.onEntry?.(entry));
         }
       )
       .on(
@@ -246,6 +291,11 @@ export function subscribeToSession(sessionId: string, handlers: Handlers): () =>
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },
         announce
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'session_members', filter },
+        announceMembers
       )
       .subscribe();
 

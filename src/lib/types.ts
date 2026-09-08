@@ -58,6 +58,14 @@ export type PinRecord = {
   salt: string;
 };
 
+/** A phone taking part in a shared event. */
+export type SessionMember = {
+  userId: string;
+  /** What that phone called itself. Null if it joined before naming existed. */
+  name: string | null;
+  joinedAt: number;
+};
+
 /** Present when an event is shared across devices. */
 export type ShareInfo = {
   /** Short code shown beneath the QR, so someone can join by typing instead. */

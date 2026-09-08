@@ -5,10 +5,10 @@ import { ActivityIndicator, Alert, View } from 'react-native';
 
 import { PromptModal } from '@/components/modals';
 import { Text } from '@/components/text';
-import { Button, Card, Screen, useBottomInset } from '@/components/ui';
+import { Button, Card, Field, Screen, useBottomInset } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
-import { fetchSession, joinSession } from '@/lib/sync';
+import { fetchSession, joinSession, setMemberName } from '@/lib/sync';
 import type { AppEvent } from '@/lib/types';
 import { radius, space, useTheme } from '@/theme';
 
@@ -29,6 +29,13 @@ export default function JoinScreen() {
   const router = useRouter();
   const bottomInset = useBottomInset();
   const adoptRemoteEvent = useStore((state) => state.adoptRemoteEvent);
+  const rememberedName = useStore((state) => state.deviceName);
+  const setDeviceName = useStore((state) => state.setDeviceName);
+
+  // The name is settled before the camera opens: it is what the other phones
+  // will see in the list, and asking afterwards would interrupt a scan.
+  const [name, setName] = useState<string | null>(rememberedName);
+  const [draftName, setDraftName] = useState(rememberedName ?? '');
   const [permission, requestPermission] = useCameraPermissions();
   const [busy, setBusy] = useState(false);
   const [typing, setTyping] = useState(false);
@@ -64,6 +71,13 @@ export default function JoinScreen() {
       };
 
       adoptRemoteEvent(event);
+
+      // Best effort: a phone that has joined but could not save its name is
+      // still in the session, and can be named again from the sharing screen.
+      if (name) {
+        await setMemberName(sessionId, name).catch(() => {});
+      }
+
       router.replace({ pathname: '/event/[id]', params: { id: sessionId } });
     } catch (error) {
       handled.current = false;
@@ -93,6 +107,41 @@ export default function JoinScreen() {
         <Card style={{ alignItems: 'center', gap: space.md }}>
           <ActivityIndicator color={theme.accent} />
           <Text style={{ color: theme.textDim }}>Bezig met deelnemen…</Text>
+        </Card>
+      );
+    }
+
+    if (!name) {
+      return (
+        <Card style={{ gap: space.md }}>
+          <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>
+            Hoe heet deze telefoon?
+          </Text>
+          <Text style={{ color: theme.textDim, fontSize: 14, lineHeight: 20 }}>
+            De anderen zien deze naam in de lijst, zodat duidelijk is welke telefoon meetelt.
+            Bijvoorbeeld je eigen naam of &quot;Bar&quot;.
+          </Text>
+          <Field
+            value={draftName}
+            onChangeText={setDraftName}
+            placeholder="Naam"
+            autoFocus
+            onSubmitEditing={() => {
+              const trimmed = draftName.trim();
+              if (!trimmed) return;
+              setDeviceName(trimmed);
+              setName(trimmed);
+            }}
+          />
+          <Button
+            title="Verder"
+            disabled={draftName.trim() === ''}
+            onPress={() => {
+              const trimmed = draftName.trim();
+              setDeviceName(trimmed);
+              setName(trimmed);
+            }}
+          />
         </Card>
       );
     }
