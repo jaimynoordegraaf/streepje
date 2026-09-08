@@ -58,6 +58,9 @@ export default function JoinScreen() {
         unsyncedEntryIds: [],
         closed: remote.closed,
         share: { joinCode: code, role: 'guest', lastSyncedAt: Date.now() },
+        // Guests never correct, so they hold no PIN. The host's PIN stays on
+        // the host's phone and is not part of what a session syncs.
+        correctionPin: null,
       };
 
       adoptRemoteEvent(event);

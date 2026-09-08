@@ -63,6 +63,16 @@ set search_path = public as $$
   );
 $$;
 
+-- Is the caller the host of this session? Only the host may remove a turf.
+create or replace function public.is_host(p_session_id text)
+returns boolean language sql security definer stable
+set search_path = public as $
+  select exists (
+    select 1 from public.sessions s
+    where s.id = p_session_id and s.host_id = auth.uid()
+  );
+$;
+
 -- Creating a session also makes the creator its first member, in one step.
 create or replace function public.create_session(p_id text, p_join_code text, p_name text)
 returns void language plpgsql security definer
@@ -129,7 +139,10 @@ create policy entries_read on public.order_entries
 
 drop policy if exists entries_insert on public.order_entries;
 create policy entries_insert on public.order_entries
-  for insert with check (public.is_member(session_id));
+  for insert with check (
+    public.is_member(session_id)
+    and (delta > 0 or public.is_host(session_id))
+  );
 
 -- ------------------------------------------------------------- realtime ----
 

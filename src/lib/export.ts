@@ -12,6 +12,8 @@ import { Share } from 'react-native';
 
 import { centsToPlainNumber, formatCents } from './money';
 import {
+  correctionCount,
+  corrections,
   eventOutstandingCents,
   eventPaidCents,
   eventTotalCents,
@@ -106,6 +108,32 @@ export function buildCsv(event: AppEvent): string {
   rows.push(csvRow(['Ontvangen', '', centsToPlainNumber(eventPaidCents(event))]));
   rows.push(csvRow(['Openstaand', '', centsToPlainNumber(eventOutstandingCents(event))]));
 
+  // Every removal, so the paper record shows what was taken off and when.
+  // Without this the CSV shows only the net result, and a turf that was
+  // removed would be indistinguishable from one never logged at all.
+  const removed = corrections(event);
+  if (removed.length > 0) {
+    const personName = (personId: string) =>
+      event.people.find((person) => person.id === personId)?.name ?? 'onbekend';
+    const itemName = (itemId: string) =>
+      event.menu.find((item) => item.id === itemId)?.name ?? 'onbekend';
+
+    rows.push('');
+    rows.push(csvRow(['CORRECTIES']));
+    rows.push(csvRow(['Tijd', 'Persoon', 'Item', 'Aantal weggehaald', 'Telefoon']));
+    for (const entry of removed) {
+      rows.push(
+        csvRow([
+          formatDateTime(entry.createdAt),
+          personName(entry.personId),
+          itemName(entry.itemId),
+          -entry.delta,
+          entry.deviceId,
+        ])
+      );
+    }
+  }
+
   return rows.join('\n');
 }
 
@@ -125,6 +153,11 @@ export function buildSummaryText(event: AppEvent): string {
   lines.push('');
   lines.push(`Totaal: ${formatCents(eventTotalCents(event))}`);
   lines.push(`Openstaand: ${formatCents(eventOutstandingCents(event))}`);
+
+  const removedCount = correctionCount(event);
+  if (removedCount > 0) {
+    lines.push(`Weggehaald: ${removedCount} ${removedCount === 1 ? 'turfje' : 'turfjes'}`);
+  }
 
   return lines.join('\n');
 }

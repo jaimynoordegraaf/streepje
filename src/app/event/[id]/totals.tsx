@@ -5,10 +5,12 @@ import { Alert, FlatList, Pressable, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { Button, Card, EmptyState, Screen, useBottomInset } from '@/components/ui';
-import { exportCsv, shareSummary } from '@/lib/export';
+import { exportCsv, formatDateTime, shareSummary } from '@/lib/export';
 import { formatCents } from '@/lib/money';
 import { useEvent, useStore } from '@/lib/store';
 import {
+  correctionCount,
+  corrections,
   eventOutstandingCents,
   eventPaidCents,
   eventTotalCents,
@@ -79,6 +81,14 @@ export default function TotalsScreen() {
               <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 2 }} />
               {totalRow('Eindtotaal', total, theme.text, true)}
 
+              {correctionCount(event) > 0 ? (
+                <Text style={{ color: theme.danger, fontSize: 13, marginTop: space.xs }}>
+                  {correctionCount(event)}{' '}
+                  {correctionCount(event) === 1 ? 'turfje is' : 'turfjes zijn'} weggehaald tijdens
+                  dit evenement.
+                </Text>
+              ) : null}
+
               <View style={{ gap: space.sm, marginTop: space.md }}>
                 <Button
                   title={busy ? 'Bezig…' : 'CSV-bestand exporteren'}
@@ -98,6 +108,7 @@ export default function TotalsScreen() {
         renderItem={({ item: person }) => {
           const lines = personLines(event, person.id);
           const personTotal = personTotalCents(event, person.id);
+          const removed = corrections(event, person.id);
 
           return (
             <Card style={{ gap: space.sm }}>
@@ -127,6 +138,27 @@ export default function TotalsScreen() {
                   </View>
                 ))
               )}
+
+              {removed.length > 0 ? (
+                <View
+                  style={{
+                    gap: 2,
+                    marginTop: space.xs,
+                    paddingTop: space.sm,
+                    borderTopWidth: 1,
+                    borderTopColor: theme.border,
+                  }}>
+                  <Text style={{ color: theme.danger, fontSize: 12, fontWeight: '700' }}>
+                    WEGGEHAALD
+                  </Text>
+                  {removed.map((entry) => (
+                    <Text key={entry.id} style={{ color: theme.textDim, fontSize: 12 }}>
+                      {formatDateTime(entry.createdAt)} · {-entry.delta}×{' '}
+                      {event.menu.find((item) => item.id === entry.itemId)?.name ?? 'onbekend'}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
 
               <Pressable
                 onPress={() => setPersonPaid(id, person.id, !person.paid)}

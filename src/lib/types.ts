@@ -48,6 +48,16 @@ export type OrderEntry = {
   createdAt: number;
 };
 
+/**
+ * A salted hash of the correction PIN. The PIN itself is never stored.
+ * Lives in lib/pin.ts; declared here so the event type does not have to
+ * import from a module that imports it back.
+ */
+export type PinRecord = {
+  hash: string;
+  salt: string;
+};
+
 /** Present when an event is shared across devices. */
 export type ShareInfo = {
   /** Short code shown beneath the QR, so someone can join by typing instead. */
@@ -80,4 +90,13 @@ export type AppEvent = {
   closed: boolean;
   /** Null while the event lives only on this phone. */
   share: ShareInfo | null;
+  /**
+   * Guards removing a turf. Null until the host sets one, at which point the
+   * app asks for it on the first attempted correction.
+   *
+   * Deliberately NOT synced to the server: it is only ever checked on the
+   * phone that owns the event, so there is no reason for other devices -- or
+   * the database -- to hold a copy.
+   */
+  correctionPin: PinRecord | null;
 };

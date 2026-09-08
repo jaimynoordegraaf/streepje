@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import type { AppEvent, MenuItem, OrderEntry, Person, ShareInfo } from './types';
+import type { AppEvent, MenuItem, OrderEntry, Person, PinRecord, ShareInfo } from './types';
 
 /** Unique id: the current time in base36 plus 10 random characters. */
 export function newId(): string {
@@ -89,6 +89,8 @@ type StoreState = {
   // --- used by the sync engine -------------------------------------------
 
   setShare: (eventId: string, share: ShareInfo | null) => void;
+  /** Set or replace the PIN that guards removing a turf. */
+  setCorrectionPin: (eventId: string, pin: PinRecord | null) => void;
   /** Take an event that exists on the server and put it on this device. */
   adoptRemoteEvent: (event: AppEvent) => void;
   /** Fold in rows the server has that this device does not. */
@@ -123,6 +125,7 @@ export const useStore = create<StoreState>()(
           unsyncedEntryIds: [],
           closed: false,
           share: null,
+          correctionPin: null,
         };
         set({ events: [event, ...get().events] });
         return id;
@@ -260,6 +263,9 @@ export const useStore = create<StoreState>()(
       setShare: (eventId, share) =>
         set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, share })) }),
 
+      setCorrectionPin: (eventId, correctionPin) =>
+        set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, correctionPin })) }),
+
       adoptRemoteEvent: (event) =>
         set({
           events: get().events.some((existing) => existing.id === event.id)
@@ -312,7 +318,7 @@ export const useStore = create<StoreState>()(
     {
       name: 'turf-store-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 3,
+      version: 4,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -363,6 +369,15 @@ export const useStore = create<StoreState>()(
           state.events = (state.events ?? []).map((event: AppEvent) => ({
             ...event,
             menu: rename(event.menu),
+          }));
+        }
+
+        if (fromVersion < 4) {
+          // Events created before the correction PIN existed simply have none;
+          // the host is asked to choose one the first time they correct.
+          state.events = (state.events ?? []).map((event: AppEvent) => ({
+            ...event,
+            correctionPin: event.correctionPin ?? null,
           }));
         }
 

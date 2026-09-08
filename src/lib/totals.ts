@@ -6,7 +6,7 @@
  * entries rather than a number someone remembered to keep up to date.
  */
 
-import type { AppEvent, MenuItem } from './types';
+import type { AppEvent, MenuItem, OrderEntry } from './types';
 
 export type Line = {
   item: MenuItem;
@@ -83,4 +83,23 @@ export function eventPaidCents(event: AppEvent): number {
 /** Money still to come in. */
 export function eventOutstandingCents(event: AppEvent): number {
   return eventTotalCents(event) - eventPaidCents(event);
+}
+
+/**
+ * Every removal, newest last.
+ *
+ * Corrections are ordinary rows with a negative delta, so they were always in
+ * the data -- they were simply never shown. Surfacing them is half of what
+ * makes removals safe: the PIN stops a casual removal, and this makes any
+ * removal that does happen impossible to hide.
+ */
+export function corrections(event: AppEvent, personId?: string): OrderEntry[] {
+  return event.entries
+    .filter((entry) => entry.delta < 0 && (personId === undefined || entry.personId === personId))
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+/** How many individual turfs have been taken off, across the whole event. */
+export function correctionCount(event: AppEvent): number {
+  return corrections(event).reduce((sum, entry) => sum - entry.delta, 0);
 }

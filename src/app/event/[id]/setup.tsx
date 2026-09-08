@@ -6,7 +6,9 @@ import { Text } from '@/components/text';
 
 import { MenuEditor } from '@/components/menu-editor';
 import { PromptModal } from '@/components/modals';
+import { PinModal } from '@/components/pin-modal';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
+import { isHostDevice } from '@/lib/pin';
 import { useEvent, useStore } from '@/lib/store';
 import type { Person } from '@/lib/types';
 import { space, useTheme } from '@/theme';
@@ -20,6 +22,7 @@ export default function SetupScreen() {
   const renameEvent = useStore((state) => state.renameEvent);
   const deleteEvent = useStore((state) => state.deleteEvent);
   const setEventClosed = useStore((state) => state.setEventClosed);
+  const setCorrectionPin = useStore((state) => state.setCorrectionPin);
   const addPerson = useStore((state) => state.addPerson);
   const renamePerson = useStore((state) => state.renamePerson);
   const removePerson = useStore((state) => state.removePerson);
@@ -30,6 +33,8 @@ export default function SetupScreen() {
   const [renamingEvent, setRenamingEvent] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
   const [renamingPerson, setRenamingPerson] = useState<Person | null>(null);
+  // 'change' asks for the current code first, then for the new one.
+  const [pinStep, setPinStep] = useState<'none' | 'set' | 'change' | 'change-new'>('none');
   const bottomInset = useBottomInset();
 
   if (!event) {
@@ -141,6 +146,38 @@ export default function SetupScreen() {
         </View>
 
         <View style={{ gap: space.sm }}>
+          <SectionTitle>Correctiecode</SectionTitle>
+          <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+            {isHostDevice(event)
+              ? 'Zonder deze code kan niemand een turfje weghalen. Turven zelf blijft gewoon één tik. De code staat alleen op deze telefoon en gaat niet mee als je het evenement deelt.'
+              : 'Turfjes weghalen kan alleen op de telefoon die dit evenement heeft aangemaakt. Op deze telefoon kun je wel turven, maar niets weghalen.'}
+          </Text>
+
+          {isHostDevice(event) ? (
+            <Card style={{ gap: space.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '600' }}>
+                  {event.correctionPin ? 'Ingesteld' : 'Nog niet ingesteld'}
+                </Text>
+                <Text
+                  style={{
+                    color: event.correctionPin ? theme.good : theme.danger,
+                    fontSize: 13,
+                    fontWeight: '700',
+                  }}>
+                  {event.correctionPin ? 'BEVEILIGD' : 'ONBEVEILIGD'}
+                </Text>
+              </View>
+              <Button
+                title={event.correctionPin ? 'Code wijzigen' : 'Code instellen'}
+                variant="secondary"
+                onPress={() => setPinStep(event.correctionPin ? 'change' : 'set')}
+              />
+            </Card>
+          ) : null}
+        </View>
+
+        <View style={{ gap: space.sm }}>
           <SectionTitle>Afronden</SectionTitle>
           <Button
             title={event.closed ? 'Evenement heropenen' : 'Evenement afsluiten'}
@@ -172,6 +209,30 @@ export default function SetupScreen() {
           addPerson(id, name);
           setAddingPerson(false);
         }}
+      />
+
+      <PinModal
+        visible={pinStep === 'set' || pinStep === 'change-new'}
+        mode="set"
+        eventId={id}
+        title={pinStep === 'change-new' ? 'Nieuwe correctiecode' : 'Correctiecode instellen'}
+        explanation="Vanaf nu is deze code nodig om een turfje weg te halen. Bewaar hem goed: hij staat alleen op deze telefoon en kan niet worden opgezocht."
+        onCancel={() => setPinStep('none')}
+        onSet={(record) => {
+          setCorrectionPin(id, record);
+          setPinStep('none');
+        }}
+      />
+
+      <PinModal
+        visible={pinStep === 'change'}
+        mode="verify"
+        eventId={id}
+        record={event.correctionPin}
+        title="Huidige code"
+        explanation="Voer eerst de huidige code in."
+        onCancel={() => setPinStep('none')}
+        onVerified={() => setPinStep('change-new')}
       />
 
       <PromptModal
