@@ -70,7 +70,7 @@ export function MenuEditor({
                   setFormOpen(true);
                 }}
                 hitSlop={8}>
-                <Text style={{ color: theme.accent, fontWeight: '600' }}>Bewerken</Text>
+                <Text style={{ color: theme.link, fontWeight: '600' }}>Bewerken</Text>
               </Pressable>
               <Pressable onPress={() => confirmRemove(item)} hitSlop={8}>
                 <Text style={{ color: theme.danger, fontWeight: '600' }}>Verwijderen</Text>

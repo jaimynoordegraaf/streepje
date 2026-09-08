@@ -6,7 +6,7 @@ import { ActivityIndicator, View, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useStore } from '@/lib/store';
-import { font, useTheme } from '@/theme';
+import { font, type as typeScale, useTheme } from '@/theme';
 
 /**
  * Loading saved data from storage takes a moment. Until it finishes the store
@@ -31,6 +31,7 @@ export default function RootLayout() {
     Montserrat_500Medium: require('@expo-google-fonts/montserrat/500Medium/Montserrat_500Medium.ttf'),
     Montserrat_600SemiBold: require('@expo-google-fonts/montserrat/600SemiBold/Montserrat_600SemiBold.ttf'),
     Montserrat_700Bold: require('@expo-google-fonts/montserrat/700Bold/Montserrat_700Bold.ttf'),
+    Montserrat_700Bold_Italic: require('@expo-google-fonts/montserrat/700Bold_Italic/Montserrat_700Bold_Italic.ttf'),
   });
 
   if (!hydrated || !fontsLoaded) {
@@ -54,7 +55,12 @@ export default function RootLayout() {
         screenOptions={{
           headerStyle: { backgroundColor: theme.card },
           headerTintColor: theme.text,
-          headerTitleStyle: { color: theme.text, fontFamily: font.bold },
+          // Bold italic, matching the logotype.
+          headerTitleStyle: {
+            color: theme.text,
+            fontFamily: font.displayItalic,
+            fontSize: typeScale.title,
+          },
           contentStyle: { backgroundColor: theme.background },
         }}
       />

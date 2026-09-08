@@ -96,7 +96,7 @@ export default function SetupScreen() {
                 {event.name}
               </Text>
               <Pressable onPress={() => setRenamingEvent(true)} hitSlop={8}>
-                <Text style={{ color: theme.accent, fontWeight: '600' }}>Hernoemen</Text>
+                <Text style={{ color: theme.link, fontWeight: '600' }}>Hernoemen</Text>
               </Pressable>
             </View>
           </Card>
@@ -114,7 +114,7 @@ export default function SetupScreen() {
                     {person.name}
                   </Text>
                   <Pressable onPress={() => setRenamingPerson(person)} hitSlop={8}>
-                    <Text style={{ color: theme.accent, fontWeight: '600' }}>Hernoemen</Text>
+                    <Text style={{ color: theme.link, fontWeight: '600' }}>Hernoemen</Text>
                   </Pressable>
                   <Pressable onPress={() => confirmRemovePerson(person)} hitSlop={8}>
                     <Text style={{ color: theme.danger, fontWeight: '600' }}>Verwijderen</Text>

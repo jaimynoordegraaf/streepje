@@ -83,7 +83,7 @@ function ShareStrip({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
           <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: dot }} />
           <Text style={{ flex: 1, color: theme.textDim, fontSize: 14 }}>{label}</Text>
-          <Text style={{ color: theme.accent, fontSize: 14, fontWeight: '600' }}>
+          <Text style={{ color: theme.link, fontSize: 14, fontWeight: '600' }}>
             {shared ? 'Beheren' : 'Delen'}
           </Text>
         </View>

@@ -235,7 +235,7 @@ export function HeaderButton({ title, onPress }: { title: string; onPress: () =>
   const theme = useTheme();
   return (
     <Pressable onPress={onPress} hitSlop={12} style={{ paddingHorizontal: space.xs }}>
-      <Text style={{ color: theme.accent, fontSize: 15, fontWeight: '600' }}>{title}</Text>
+      <Text style={{ color: theme.link, fontSize: 15, fontWeight: '600' }}>{title}</Text>
     </Pressable>
   );
 }

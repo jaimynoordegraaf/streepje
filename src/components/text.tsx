@@ -13,9 +13,13 @@ import { Text as RNText, StyleSheet, TextProps } from 'react-native';
 
 import { font } from '@/theme';
 
-function familyForWeight(weight: unknown): string {
+function familyFor(weight: unknown, italic: boolean): string {
   const numeric =
     weight === 'bold' ? 700 : weight === 'normal' || weight == null ? 400 : Number(weight) || 400;
+
+  // Only the display face has an italic cut loaded, so italic implies bold.
+  if (italic) return font.displayItalic;
+
   if (numeric >= 700) return font.bold;
   if (numeric >= 600) return font.semibold;
   if (numeric >= 500) return font.medium;
@@ -24,6 +28,13 @@ function familyForWeight(weight: unknown): string {
 
 export function Text({ style, ...rest }: TextProps) {
   const flattened = StyleSheet.flatten(style) ?? {};
-  const { fontWeight, ...withoutWeight } = flattened;
-  return <RNText {...rest} style={[withoutWeight, { fontFamily: familyForWeight(fontWeight) }]} />;
+  // Both are dropped and expressed as a family instead: leaving them in makes
+  // Android fake a slant or a weight on top of an already-correct face.
+  const { fontWeight, fontStyle, ...rest2 } = flattened;
+  return (
+    <RNText
+      {...rest}
+      style={[rest2, { fontFamily: familyFor(fontWeight, fontStyle === 'italic') }]}
+    />
+  );
 }

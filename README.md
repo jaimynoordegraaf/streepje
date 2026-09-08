@@ -3,8 +3,8 @@
 Turf wie wat gedronken en gegeten heeft op een evenement, en wie er aan het eind
 nog moet betalen.
 
-An Android app for Scouting Jan Willem Friso. The interface and the CSV export
-are in Dutch; the code and this file are in English.
+An Android app in the streepje house style. The interface and the CSV export are
+in Dutch; the code and this file are in English.
 
 - **Local first.** Everything works with no signal and no account. Tapping a
   drink writes to the phone, and nothing waits on a network.
@@ -107,12 +107,24 @@ edited rather than appended. Two people renaming the same person in the same
 second means one edit wins. Acceptable, because that is setup work done before an
 event rather than during it.
 
-**Brand colours are adjusted for contrast.** The JWF logo's teal and green reach
-only 2.5–3.1 contrast behind white text, well under the 4.5 small text needs. The
-website never asks them to do that — its yellow badge and cyan footer both carry
-dark text. So bright brand colours are used as surfaces under dark text, and a
-deepened teal-green (`#227A63`) carries white text on buttons. Every pairing in
-`theme.ts` is checked against WCAG AA. Check any new one before adding it.
+**Brand colours are adjusted for contrast.** The streepje sheet notes that its
+pale tints need black text "voor betere leesbaarheid". Measured, the full
+strength colours need it too: behind white text the orange reaches only 3.37
+contrast and the blue 2.55, against the 4.5 small text needs; behind black they
+are fine at 5.37 and 7.10. So brand colours are used as **surfaces carrying dark
+text**, never as a bed for white text — which is why filled buttons are orange
+with a near-black label.
+
+Those same colours also fail as small text on white, so anything that is text
+rather than a surface uses a deepened tone: `link` and `good` are `#1F6FA8`,
+`danger` is `#C8410F`. The bright orange still appears at full strength where it
+is a large glyph or a filled button. Every pairing in `theme.ts` is checked
+against WCAG AA — check any new one before adding it.
+
+**Type is Montserrat on a golden-ratio scale**, as the sheet specifies: 15 → 24 →
+39, each step 1.618 times the last, with the display face in bold italic to match
+the logotype. `small` (12) sits off the scale deliberately; continuing downwards
+gives 9.3pt, too small to read at arm's length in a dim bar.
 
 ## Building an installable APK
 
