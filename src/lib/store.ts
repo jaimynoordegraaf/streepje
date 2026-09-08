@@ -245,6 +245,7 @@ export const useStore = create<StoreState>()(
               itemId,
               delta,
               deviceId: get().deviceId,
+              deviceName: get().deviceName,
               createdAt: Date.now(),
             };
             return {
@@ -328,7 +329,7 @@ export const useStore = create<StoreState>()(
     {
       name: 'turf-store-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 4,
+      version: 5,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -351,6 +352,7 @@ export const useStore = create<StoreState>()(
                     itemId,
                     delta: count,
                     deviceId: state.deviceId,
+                    deviceName: null,
                     createdAt: event.createdAt ?? Date.now(),
                   });
                 }
@@ -388,6 +390,17 @@ export const useStore = create<StoreState>()(
           state.events = (state.events ?? []).map((event: AppEvent) => ({
             ...event,
             correctionPin: event.correctionPin ?? null,
+          }));
+        }
+
+        if (fromVersion < 5) {
+          // Entries written before phones had names simply have none.
+          state.events = (state.events ?? []).map((event: AppEvent) => ({
+            ...event,
+            entries: (event.entries ?? []).map((entry: OrderEntry) => ({
+              ...entry,
+              deviceName: entry.deviceName ?? null,
+            })),
           }));
         }
 

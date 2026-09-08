@@ -12,6 +12,7 @@ import { useEvent, useStore } from '@/lib/store';
 import {
   correctionCount,
   corrections,
+  deviceLabel,
   eventOutstandingCents,
   eventPaidCents,
   eventTotalCents,
@@ -155,7 +156,8 @@ export default function TotalsScreen() {
                   {removed.map((entry) => (
                     <Text key={entry.id} style={{ color: theme.textDim, fontSize: 12 }}>
                       {formatDateTime(entry.createdAt)} · {-entry.delta}×{' '}
-                      {event.menu.find((item) => item.id === entry.itemId)?.name ?? 'onbekend'}
+                      {event.menu.find((item) => item.id === entry.itemId)?.name ?? 'onbekend'} ·{' '}
+                      {deviceLabel(entry)}
                     </Text>
                   ))}
                 </View>

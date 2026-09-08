@@ -103,3 +103,16 @@ export function corrections(event: AppEvent, personId?: string): OrderEntry[] {
 export function correctionCount(event: AppEvent): number {
   return corrections(event).reduce((sum, entry) => sum - entry.delta, 0);
 }
+
+/**
+ * How to name the phone that logged an entry, for someone reading the record.
+ *
+ * The name is whatever that phone called itself at the time. Entries from
+ * before naming existed, or from a phone that never shared, fall back to a
+ * short form of the device id -- meaningless on its own, but still enough to
+ * tell two phones apart in a list.
+ */
+export function deviceLabel(entry: OrderEntry): string {
+  if (entry.deviceName && entry.deviceName.trim() !== '') return entry.deviceName;
+  return `telefoon ${entry.deviceId.slice(0, 6)}`;
+}

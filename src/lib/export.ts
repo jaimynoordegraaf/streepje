@@ -14,6 +14,7 @@ import { centsToPlainNumber, formatCents } from './money';
 import {
   correctionCount,
   corrections,
+  deviceLabel,
   eventOutstandingCents,
   eventPaidCents,
   eventTotalCents,
@@ -128,7 +129,7 @@ export function buildCsv(event: AppEvent): string {
           personName(entry.personId),
           itemName(entry.itemId),
           -entry.delta,
-          entry.deviceId,
+          deviceLabel(entry),
         ])
       );
     }

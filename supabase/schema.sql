@@ -47,6 +47,7 @@ create table if not exists public.order_entries (
   item_id     text not null,
   delta       integer not null,
   device_id   text not null,
+  device_name text,
   created_at  timestamptz not null default now()
 );
 

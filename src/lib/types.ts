@@ -45,6 +45,13 @@ export type OrderEntry = {
   delta: number;
   /** Which phone logged this, so an order can be traced back. */
   deviceId: string;
+  /**
+   * What that phone called itself at the time, copied in rather than looked
+   * up. A device renaming itself later must not change what the record says it
+   * did earlier. Null for entries logged before naming existed, or on a phone
+   * that has never shared.
+   */
+  deviceName: string | null;
   createdAt: number;
 };
 

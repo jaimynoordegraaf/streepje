@@ -38,6 +38,7 @@ type EntryRow = {
   item_id: string;
   delta: number;
   device_id: string;
+  device_name: string | null;
   created_at: string;
 };
 
@@ -79,6 +80,7 @@ const toEntry = (row: EntryRow): OrderEntry => ({
   itemId: row.item_id,
   delta: row.delta,
   deviceId: row.device_id,
+  deviceName: row.device_name,
   createdAt: Date.parse(row.created_at),
 });
 
@@ -89,6 +91,7 @@ const fromEntry = (sessionId: string, entry: OrderEntry): EntryRow => ({
   item_id: entry.itemId,
   delta: entry.delta,
   device_id: entry.deviceId,
+  device_name: entry.deviceName,
   created_at: new Date(entry.createdAt).toISOString(),
 });
 
