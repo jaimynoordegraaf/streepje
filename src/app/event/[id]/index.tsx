@@ -11,6 +11,7 @@ import { formatCents } from '@/lib/money';
 import { useEvent, useStore } from '@/lib/store';
 import { useEventSync, type SyncStatus } from '@/lib/use-sync';
 import {
+  activePeople,
   eventOutstandingCents,
   eventPaidCents,
   eventTotalCents,
@@ -158,7 +159,7 @@ export default function EventScreen() {
       />
 
       <FlatList
-        data={event.people}
+        data={activePeople(event)}
         keyExtractor={(person) => person.id}
         contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: space.xxl }}
         ListHeaderComponent={

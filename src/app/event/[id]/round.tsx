@@ -7,6 +7,7 @@ import { Text } from '@/components/text';
 import { BottomBar, Button, Card, EmptyState, Screen, SectionTitle } from '@/components/ui';
 import { formatCents } from '@/lib/money';
 import { useEvent, useStore } from '@/lib/store';
+import { activeMenu, activePeople } from '@/lib/totals';
 import { radius, space, useTheme } from '@/theme';
 
 /**
@@ -35,7 +36,7 @@ export default function RoundScreen() {
     );
   }
 
-  const item = event.menu.find((candidate) => candidate.id === itemId) ?? null;
+  const item = activeMenu(event).find((candidate) => candidate.id === itemId) ?? null;
   const ready = item !== null && chosen.length > 0;
 
   const toggle = (personId: string) =>
@@ -56,14 +57,14 @@ export default function RoundScreen() {
       <Stack.Screen options={{ title: 'Rondje' }} />
 
       <FlatList
-        data={event.people}
+        data={activePeople(event)}
         keyExtractor={(person) => person.id}
         contentContainerStyle={{ padding: space.lg, gap: space.sm, paddingBottom: space.xxl }}
         ListHeaderComponent={
           <View style={{ gap: space.sm, marginBottom: space.sm }}>
             <SectionTitle>Wat</SectionTitle>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-              {event.menu.map((candidate) => {
+              {activeMenu(event).map((candidate) => {
                 const active = candidate.id === itemId;
                 return (
                   <Pressable
@@ -102,14 +103,14 @@ export default function RoundScreen() {
               <Pressable
                 onPress={() =>
                   setChosen(
-                    chosen.length === event.people.length
+                    chosen.length === activePeople(event).length
                       ? []
-                      : event.people.map((person) => person.id)
+                      : activePeople(event).map((person) => person.id)
                   )
                 }
                 hitSlop={10}>
                 <Text style={{ color: theme.link, fontSize: 14, fontWeight: '600' }}>
-                  {chosen.length === event.people.length ? 'Niemand' : 'Iedereen'}
+                  {chosen.length === activePeople(event).length ? 'Niemand' : 'Iedereen'}
                 </Text>
               </Pressable>
             </View>

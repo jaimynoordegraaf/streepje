@@ -14,7 +14,7 @@ import {
   unlockCorrections,
 } from '@/lib/pin';
 import { useEvent, useStore } from '@/lib/store';
-import { personItemCount, personTotalCents, quantities } from '@/lib/totals';
+import { activeMenu, personItemCount, personTotalCents, quantities } from '@/lib/totals';
 import type { MenuItem } from '@/lib/types';
 import { space, useTheme } from '@/theme';
 
@@ -48,8 +48,9 @@ export default function PersonScreen() {
 
   // Counted once here rather than per menu row, so the whole screen is one pass.
   const counts = quantities(event, person.id);
-  const drinks = event.menu.filter((item) => item.category === 'drink');
-  const food = event.menu.filter((item) => item.category === 'food');
+  const offered = activeMenu(event);
+  const drinks = offered.filter((item) => item.category === 'drink');
+  const food = offered.filter((item) => item.category === 'food');
 
   const sections = [
     { title: 'Drankjes', data: drinks },

@@ -13,6 +13,8 @@ import { formatCents } from '@/lib/money';
 import { useEvent, useStore } from '@/lib/store';
 import type { Person } from '@/lib/types';
 import {
+  activePeople,
+  removedPeople,
   correctionCount,
   corrections,
   deviceLabel,
@@ -79,12 +81,40 @@ export default function TotalsScreen() {
       <Stack.Screen options={{ title: 'Totalen' }} />
 
       <FlatList
-        data={event.people}
+        data={activePeople(event)}
         keyExtractor={(person) => person.id}
         contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: space.xxl + bottomInset }}
         ListEmptyComponent={<EmptyState title="Nog niemand in dit evenement" />}
         ListFooterComponent={
-          event.people.length > 0 ? (
+          activePeople(event).length > 0 || removedPeople(event).length > 0 ? (
+            <>
+            {removedPeople(event).length > 0 ? (
+              <Card style={{ gap: space.sm, marginBottom: space.md }}>
+                <Text style={{ color: theme.danger, fontSize: 12, fontWeight: '700' }}>
+                  VERWIJDERDE PERSONEN
+                </Text>
+                <Text style={{ color: theme.textDim, fontSize: 12 }}>
+                  Hun turfjes tellen niet meer mee, maar blijven hier zichtbaar.
+                </Text>
+                {removedPeople(event).map((person) => (
+                  <View key={person.id} style={{ gap: 2, marginTop: space.xs }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>
+                        {person.name}
+                      </Text>
+                      <Text style={{ color: theme.textDim, fontSize: 14 }}>
+                        {formatCents(personTotalCents(event, person.id))}
+                      </Text>
+                    </View>
+                    <Text style={{ color: theme.textDim, fontSize: 12 }}>
+                      {person.removedAt ? formatDateTime(person.removedAt) : ''}
+                      {person.removedBy ? ` · ${person.removedBy}` : ''}
+                    </Text>
+                  </View>
+                ))}
+              </Card>
+            ) : null}
+
             <Card style={{ gap: space.sm, marginTop: space.xs }}>
               {totalRow('Ontvangen', received, theme.good)}
               {totalRow('Openstaand', outstanding, outstanding > 0 ? theme.danger : theme.textDim)}
@@ -113,6 +143,7 @@ export default function TotalsScreen() {
                 />
               </View>
             </Card>
+            </>
           ) : null
         }
         renderItem={({ item: person }) => {

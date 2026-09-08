@@ -98,13 +98,23 @@ type StoreState = {
    */
   addUnknownPerson: (eventId: string) => string;
   renamePerson: (eventId: string, personId: string, name: string) => void;
-  removePerson: (eventId: string, personId: string) => void;
+  /**
+   * Take someone off the event without destroying what they had.
+   *
+   * Guarded in the interface by the correction PIN and the host phone, for the
+   * same reason removing a single turf is: this used to delete their entries
+   * outright, which erased money and left nothing behind to notice.
+   */
+  removePerson: (eventId: string, personId: string, removedBy: string | null) => void;
+  restorePerson: (eventId: string, personId: string) => void;
   /** Record the total handed over so far. Pass 0 to undo a payment. */
   setPersonPayment: (eventId: string, personId: string, paidCents: number) => void;
 
   addItem: (eventId: string, draft: Omit<MenuItem, 'id'>) => void;
   updateItem: (eventId: string, itemId: string, patch: Partial<Omit<MenuItem, 'id'>>) => void;
+  /** Takes an item off the menu; past turfs for it still count. */
   removeItem: (eventId: string, itemId: string) => void;
+  restoreItem: (eventId: string, itemId: string) => void;
 
   /** Log an order (delta 1) or a correction (delta -1). Always appends. */
   addOrder: (eventId: string, personId: string, itemId: string, delta: number) => void;
@@ -187,6 +197,8 @@ export const useStore = create<StoreState>()(
               name: name.trim() || 'Iemand',
               paidCents: 0,
               paidAt: null,
+              removedAt: null,
+              removedBy: null,
             };
             return { ...event, people: [...event.people, person] };
           }),
@@ -199,7 +211,14 @@ export const useStore = create<StoreState>()(
             const fresh = names
               .map((name) => name.trim())
               .filter((name) => name !== '' && !taken.has(name.toLowerCase()))
-              .map((name) => ({ id: newId(), name, paidCents: 0, paidAt: null }));
+              .map((name) => ({
+                id: newId(),
+                name,
+                paidCents: 0,
+                paidAt: null,
+                removedAt: null,
+                removedBy: null,
+              }));
             return { ...event, people: [...event.people, ...fresh] };
           }),
         }),
@@ -216,6 +235,8 @@ export const useStore = create<StoreState>()(
               name: `Onbekend ${used.length + 1}`,
               paidCents: 0,
               paidAt: null,
+              removedAt: null,
+              removedBy: null,
             };
             return { ...event, people: [...event.people, person] };
           }),
@@ -233,20 +254,29 @@ export const useStore = create<StoreState>()(
           })),
         }),
 
-      removePerson: (eventId, personId) =>
+      removePerson: (eventId, personId, removedBy) =>
         set({
-          events: mapEvent(get().events, eventId, (event) => {
-            const people = event.people.filter((person) => person.id !== personId);
-            return {
-              ...event,
-              people,
-              entries: pruneEntries(
-                event.entries,
-                people.map((person) => person.id),
-                event.menu.map((item) => item.id)
-              ),
-            };
-          }),
+          events: mapEvent(get().events, eventId, (event) => ({
+            ...event,
+            // Their entries deliberately stay. The log is the record.
+            people: event.people.map((person) =>
+              person.id === personId
+                ? { ...person, removedAt: Date.now(), removedBy }
+                : person
+            ),
+          })),
+        }),
+
+      restorePerson: (eventId, personId) =>
+        set({
+          events: mapEvent(get().events, eventId, (event) => ({
+            ...event,
+            people: event.people.map((person) =>
+              person.id === personId
+                ? { ...person, removedAt: null, removedBy: null }
+                : person
+            ),
+          })),
         }),
 
       setPersonPayment: (eventId, personId, paidCents) =>
@@ -283,18 +313,24 @@ export const useStore = create<StoreState>()(
 
       removeItem: (eventId, itemId) =>
         set({
-          events: mapEvent(get().events, eventId, (event) => {
-            const menu = event.menu.filter((item) => item.id !== itemId);
-            return {
-              ...event,
-              menu,
-              entries: pruneEntries(
-                event.entries,
-                event.people.map((person) => person.id),
-                menu.map((item) => item.id)
-              ),
-            };
-          }),
+          events: mapEvent(get().events, eventId, (event) => ({
+            ...event,
+            // Kept rather than deleted: turfs already logged against it still
+            // need its price, and dropping them would erase money silently.
+            menu: event.menu.map((item) =>
+              item.id === itemId ? { ...item, hidden: true } : item
+            ),
+          })),
+        }),
+
+      restoreItem: (eventId, itemId) =>
+        set({
+          events: mapEvent(get().events, eventId, (event) => ({
+            ...event,
+            menu: event.menu.map((item) =>
+              item.id === itemId ? { ...item, hidden: false } : item
+            ),
+          })),
         }),
 
       addOrder: (eventId, personId, itemId, delta) =>
@@ -405,7 +441,7 @@ export const useStore = create<StoreState>()(
     {
       name: 'turf-store-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 6,
+      version: 7,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -507,6 +543,17 @@ export const useStore = create<StoreState>()(
               }),
             };
           });
+        }
+
+        if (fromVersion < 7) {
+          state.events = (state.events ?? []).map((event: AppEvent) => ({
+            ...event,
+            people: (event.people ?? []).map((person: Person) => ({
+              ...person,
+              removedAt: person.removedAt ?? null,
+              removedBy: person.removedBy ?? null,
+            })),
+          }));
         }
 
         return state;

@@ -14,6 +14,8 @@ import { centsToPlainNumber, formatCents } from './money';
 import { useStore } from './store';
 import {
   correctionCount,
+  activePeople,
+  removedPeople,
   corrections,
   deviceLabel,
   isSettled,
@@ -73,7 +75,7 @@ export function buildCsv(event: AppEvent, local?: LocalDevice): string {
 
   rows.push(csvRow(['DETAILS']));
   rows.push(csvRow(['Persoon', 'Item', 'Categorie', 'Aantal', 'Stukprijs', 'Regeltotaal']));
-  for (const person of event.people) {
+  for (const person of activePeople(event)) {
     const lines = personLines(event, person.id);
     if (lines.length === 0) {
       rows.push(csvRow([person.name, '(niets geturfd)', '', 0, '', '0.00']));
@@ -96,7 +98,7 @@ export function buildCsv(event: AppEvent, local?: LocalDevice): string {
 
   rows.push(csvRow(['OVERZICHT']));
   rows.push(csvRow(['Persoon', 'Consumpties', 'Totaal', 'Betaald', 'Openstaand', 'Betaald op']));
-  for (const person of event.people) {
+  for (const person of activePeople(event)) {
     rows.push(
       csvRow([
         person.name,
@@ -140,13 +142,34 @@ export function buildCsv(event: AppEvent, local?: LocalDevice): string {
     }
   }
 
+
+  // People taken off the event. Their turfs are not deleted and their money
+  // no longer counts, so the record has to say who went and who removed them.
+  // Without this the total would simply be smaller, with nothing to explain it.
+  const gone = removedPeople(event);
+  if (gone.length > 0) {
+    rows.push('');
+    rows.push(csvRow(['VERWIJDERDE PERSONEN']));
+    rows.push(csvRow(['Persoon', 'Consumpties', 'Bedrag', 'Verwijderd op', 'Door']));
+    for (const person of gone) {
+      rows.push(
+        csvRow([
+          person.name,
+          personItemCount(event, person.id),
+          centsToPlainNumber(personTotalCents(event, person.id)),
+          person.removedAt ? formatDateTime(person.removedAt) : '',
+          person.removedBy ?? '',
+        ])
+      );
+    }
+  }
   return rows.join('\n');
 }
 
 export function buildSummaryText(event: AppEvent): string {
   const lines: string[] = [`${event.name} - ${formatDate(event.createdAt)}`, ''];
 
-  for (const person of event.people) {
+  for (const person of activePeople(event)) {
     const total = personTotalCents(event, person.id);
     const detail = personLines(event, person.id)
       .map((line) => `${line.quantity}x ${line.item.name}`)

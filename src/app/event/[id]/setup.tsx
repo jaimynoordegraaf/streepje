@@ -8,8 +8,15 @@ import { MenuEditor } from '@/components/menu-editor';
 import { PromptModal } from '@/components/modals';
 import { PinModal } from '@/components/pin-modal';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
-import { isHostDevice } from '@/lib/pin';
+import {
+  correctionBlock,
+  correctionsUnlocked,
+  isHostDevice,
+  unlockCorrections,
+} from '@/lib/pin';
 import { useEvent, useStore } from '@/lib/store';
+import { formatDateTime } from '@/lib/export';
+import { activePeople, removedPeople } from '@/lib/totals';
 import type { Person } from '@/lib/types';
 import { space, useTheme } from '@/theme';
 
@@ -28,6 +35,8 @@ export default function SetupScreen() {
   const defaultPeople = useStore((state) => state.defaultPeople);
   const renamePerson = useStore((state) => state.renamePerson);
   const removePerson = useStore((state) => state.removePerson);
+  const restorePerson = useStore((state) => state.restorePerson);
+  const deviceName = useStore((state) => state.deviceName);
   const addItem = useStore((state) => state.addItem);
   const updateItem = useStore((state) => state.updateItem);
   const removeItem = useStore((state) => state.removeItem);
@@ -37,6 +46,9 @@ export default function SetupScreen() {
   const [renamingPerson, setRenamingPerson] = useState<Person | null>(null);
   // 'change' asks for the current code first, then for the new one.
   const [pinStep, setPinStep] = useState<'none' | 'set' | 'change' | 'change-new'>('none');
+  // Who is waiting on the PIN before being removed.
+  const [removing, setRemoving] = useState<Person | null>(null);
+  const [removeAsk, setRemoveAsk] = useState<'verify' | 'set' | null>(null);
   const bottomInset = useBottomInset();
 
   if (!event) {
@@ -48,16 +60,41 @@ export default function SetupScreen() {
     );
   }
 
+  const doRemove = (person: Person) => removePerson(id, person.id, deviceName);
+
+  /**
+   * Removing someone takes their turfs out of the total, so it is guarded
+   * exactly as removing a single turf is: the host phone, and the PIN.
+   * Without this it was a way round the PIN entirely -- delete the person and
+   * their turfs went with them, quietly.
+   */
   const confirmRemovePerson = (person: Person) => {
+    const block = correctionBlock(event);
+
+    if (!block.allowed && block.reason === 'guest') {
+      Alert.alert(
+        'Alleen op de hoofdtelefoon',
+        'Iemand verwijderen kan alleen op de telefoon die dit evenement heeft aangemaakt.'
+      );
+      return;
+    }
+
     Alert.alert(
-      `Remove ${person.name}?`,
-      'Alles wat voor deze persoon geturfd is, wordt ook verwijderd.',
+      `${person.name} verwijderen?`,
+      'Wat er geturfd is blijft bewaard en is terug te zien bij de totalen, maar telt niet meer mee.',
       [
         { text: 'Annuleren', style: 'cancel' },
         {
           text: 'Verwijderen',
           style: 'destructive',
-          onPress: () => removePerson(id, person.id),
+          onPress: () => {
+            if (correctionsUnlocked(id)) {
+              doRemove(person);
+              return;
+            }
+            setRemoving(person);
+            setRemoveAsk(!block.allowed && block.reason === 'no-pin' ? 'set' : 'verify');
+          },
         },
       ]
     );
@@ -106,10 +143,10 @@ export default function SetupScreen() {
 
         <View style={{ gap: space.sm }}>
           <SectionTitle>Personen</SectionTitle>
-          {event.people.length === 0 ? (
+          {activePeople(event).length === 0 ? (
             <EmptyState title="Nog niemand toegevoegd" />
           ) : (
-            event.people.map((person) => (
+            activePeople(event).map((person) => (
               <Card key={person.id} style={{ paddingVertical: space.md }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
                   <Text style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '600' }}>
@@ -125,6 +162,34 @@ export default function SetupScreen() {
               </Card>
             ))
           )}
+          {removedPeople(event).length > 0 ? (
+            <View style={{ gap: space.sm, marginTop: space.sm }}>
+              <Text style={{ color: theme.textDim, fontSize: 13, fontWeight: '700' }}>
+                VERWIJDERD
+              </Text>
+              {removedPeople(event).map((person) => (
+                <Card key={person.id} style={{ paddingVertical: space.md }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: theme.textDim, fontSize: 16, fontWeight: '600' }}>
+                        {person.name}
+                      </Text>
+                      <Text style={{ color: theme.textDim, fontSize: 12 }}>
+                        {person.removedAt ? formatDateTime(person.removedAt) : ''}
+                        {person.removedBy ? ` · ${person.removedBy}` : ''}
+                      </Text>
+                    </View>
+                    {isHostDevice(event) ? (
+                      <Pressable onPress={() => restorePerson(id, person.id)} hitSlop={8}>
+                        <Text style={{ color: theme.link, fontWeight: '600' }}>Terugzetten</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </Card>
+              ))}
+            </View>
+          ) : null}
+
           <Button title="Persoon toevoegen" variant="secondary" onPress={() => setAddingPerson(true)} />
 
           {defaultPeople.length > 0 ? (
@@ -250,6 +315,36 @@ export default function SetupScreen() {
         explanation="Voer eerst de huidige code in."
         onCancel={() => setPinStep('none')}
         onVerified={() => setPinStep('change-new')}
+      />
+
+      <PinModal
+        visible={removeAsk !== null}
+        mode={removeAsk === 'set' ? 'set' : 'verify'}
+        eventId={id}
+        record={event.correctionPin}
+        title={removing ? `${removing.name} verwijderen` : 'Verwijderen'}
+        explanation={
+          removeAsk === 'set'
+            ? 'Er is nog geen correctiecode. Kies er een; die is vanaf nu nodig om te verwijderen.'
+            : 'Voer de code in om deze persoon te verwijderen.'
+        }
+        onCancel={() => {
+          setRemoving(null);
+          setRemoveAsk(null);
+        }}
+        onVerified={() => {
+          unlockCorrections(id);
+          if (removing) doRemove(removing);
+          setRemoving(null);
+          setRemoveAsk(null);
+        }}
+        onSet={(record) => {
+          setCorrectionPin(id, record);
+          unlockCorrections(id);
+          if (removing) doRemove(removing);
+          setRemoving(null);
+          setRemoveAsk(null);
+        }}
       />
 
       <PromptModal

@@ -69,8 +69,25 @@ export function personItemCount(event: AppEvent, personId: string): number {
   return Object.values(counts).reduce((sum, quantity) => sum + Math.max(0, quantity), 0);
 }
 
+/** People still part of the event. Removed ones are kept, but do not count. */
+export function activePeople(event: AppEvent): Person[] {
+  return event.people.filter((person) => person.removedAt === null);
+}
+
+/** People taken off the event, newest removal last. */
+export function removedPeople(event: AppEvent): Person[] {
+  return event.people
+    .filter((person) => person.removedAt !== null)
+    .sort((a, b) => (a.removedAt ?? 0) - (b.removedAt ?? 0));
+}
+
+/** Items still offered. Hidden ones keep their price for past turfs. */
+export function activeMenu(event: AppEvent): MenuItem[] {
+  return event.menu.filter((item) => !item.hidden);
+}
+
 export function eventTotalCents(event: AppEvent): number {
-  return event.people.reduce((sum, person) => sum + personTotalCents(event, person.id), 0);
+  return activePeople(event).reduce((sum, person) => sum + personTotalCents(event, person.id), 0);
 }
 
 /** What one person still owes. Never negative: overpaying is not a debt. */
@@ -85,7 +102,7 @@ export function isSettled(event: AppEvent, person: Person): boolean {
 
 /** Money actually collected. */
 export function eventPaidCents(event: AppEvent): number {
-  return event.people.reduce((sum, person) => sum + person.paidCents, 0);
+  return activePeople(event).reduce((sum, person) => sum + person.paidCents, 0);
 }
 
 /**
@@ -95,7 +112,10 @@ export function eventPaidCents(event: AppEvent): number {
  * overpaid cannot quietly cancel out what somebody else still owes.
  */
 export function eventOutstandingCents(event: AppEvent): number {
-  return event.people.reduce((sum, person) => sum + personOutstandingCents(event, person), 0);
+  return activePeople(event).reduce(
+    (sum, person) => sum + personOutstandingCents(event, person),
+    0
+  );
 }
 
 /**

@@ -27,6 +27,8 @@ type PersonRow = {
   paid: boolean;
   paid_cents: number;
   paid_at: string | null;
+  removed_at: string | null;
+  removed_by: string | null;
 };
 type ItemRow = {
   id: string;
@@ -34,6 +36,7 @@ type ItemRow = {
   name: string;
   price_cents: number;
   category: string;
+  hidden: boolean;
 };
 type EntryRow = {
   id: string;
@@ -53,6 +56,8 @@ const toPerson = (row: PersonRow): Person => ({
   name: row.name,
   paidCents: row.paid_cents ?? 0,
   paidAt: row.paid_at ? Date.parse(row.paid_at) : null,
+  removedAt: row.removed_at ? Date.parse(row.removed_at) : null,
+  removedBy: row.removed_by ?? null,
 });
 
 const fromPerson = (sessionId: string, person: Person, settled: boolean): PersonRow => ({
@@ -62,6 +67,8 @@ const fromPerson = (sessionId: string, person: Person, settled: boolean): Person
   paid: settled,
   paid_cents: person.paidCents,
   paid_at: person.paidAt ? new Date(person.paidAt).toISOString() : null,
+  removed_at: person.removedAt ? new Date(person.removedAt).toISOString() : null,
+  removed_by: person.removedBy,
 });
 
 const toItem = (row: ItemRow): MenuItem => ({
@@ -69,6 +76,7 @@ const toItem = (row: ItemRow): MenuItem => ({
   name: row.name,
   priceCents: row.price_cents,
   category: row.category as Category,
+  hidden: row.hidden ?? false,
 });
 
 const fromItem = (sessionId: string, item: MenuItem): ItemRow => ({
@@ -77,6 +85,7 @@ const fromItem = (sessionId: string, item: MenuItem): ItemRow => ({
   name: item.name,
   price_cents: item.priceCents,
   category: item.category,
+  hidden: item.hidden ?? false,
 });
 
 const toEntry = (row: EntryRow): OrderEntry => ({

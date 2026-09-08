@@ -28,6 +28,8 @@ create table if not exists public.session_people (
   name        text not null,
   paid        boolean not null default false,
   paid_cents  integer not null default 0,
+  removed_at  timestamptz,
+  removed_by  text,
   paid_at     timestamptz
 );
 
@@ -36,7 +38,8 @@ create table if not exists public.session_items (
   session_id  text not null references public.sessions(id) on delete cascade,
   name        text not null,
   price_cents integer not null,
-  category    text not null check (category in ('drink','food'))
+  category    text not null check (category in ('drink','food')),
+  hidden      boolean not null default false
 );
 
 -- The order log. Rows are only ever inserted, never updated or deleted, which

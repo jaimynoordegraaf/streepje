@@ -15,6 +15,11 @@ export type MenuItem = {
   name: string;
   priceCents: number;
   category: Category;
+  /**
+   * Taken off the menu, but kept so past turfs still have a price and still
+   * count. Removing an item used to delete every turf for it.
+   */
+  hidden?: boolean;
 };
 
 /** A name kept between events, so the same crew is not retyped every time. */
@@ -38,6 +43,17 @@ export type Person = {
   paidCents: number;
   /** When money was last taken from them. Null if none has been. */
   paidAt: number | null;
+  /**
+   * When this person was removed from the event, if they were.
+   *
+   * Removing does not delete. Their turfs stay in the log, and the removal
+   * itself is shown on the totals and in the export. Deleting outright would
+   * have been a way to erase money without leaving a trace, which is exactly
+   * what the correction PIN exists to prevent.
+   */
+  removedAt: number | null;
+  /** Which phone removed them, by name, as it stood at the time. */
+  removedBy: string | null;
 };
 
 /**

@@ -46,7 +46,7 @@ export function MenuEditor({
   };
 
   const group = (title: string, category: Category) => {
-    const groupItems = items.filter((item) => item.category === category);
+    const groupItems = items.filter((item) => item.category === category && !item.hidden);
     if (groupItems.length === 0) return null;
 
     return (
