@@ -49,6 +49,7 @@ export default function SetupScreen() {
   // Who is waiting on the PIN before being removed.
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeAsk, setRemoveAsk] = useState<'verify' | 'set' | null>(null);
+  const [deleteAsk, setDeleteAsk] = useState<'verify' | 'set' | null>(null);
   const bottomInset = useBottomInset();
 
   if (!event) {
@@ -100,18 +101,39 @@ export default function SetupScreen() {
     );
   };
 
+  const doDeleteEvent = () => {
+    deleteEvent(id);
+    router.dismissTo('/');
+  };
+
+  /**
+   * Deleting the event is the last way to make an evening's takings vanish, so
+   * on the phone that owns it the PIN is required, like every other way of
+   * removing turfs.
+   *
+   * On a phone that joined, deleting only drops this phone's copy: the shared
+   * list and everyone else's still stand. That is leaving, not destroying, so
+   * it is not blocked -- and a guest has no reason to know the host's PIN.
+   */
   const confirmDeleteEvent = () => {
+    const guest = !isHostDevice(event);
+
     Alert.alert(
-      `Delete ${event.name}?`,
-      'Dit verwijdert het evenement en alles wat erin geturfd is definitief. Exporteer eerst als je de gegevens nog nodig hebt.',
+      `${event.name} verwijderen?`,
+      guest
+        ? 'Dit haalt het evenement van deze telefoon. De gedeelde lijst en de andere telefoons blijven ongemoeid.'
+        : 'Dit verwijdert het evenement en alles wat erin geturfd is van deze telefoon. Exporteer eerst als je de gegevens nog nodig hebt.',
       [
         { text: 'Annuleren', style: 'cancel' },
         {
           text: 'Verwijderen',
           style: 'destructive',
           onPress: () => {
-            deleteEvent(id);
-            router.dismissTo('/');
+            if (guest || correctionsUnlocked(id)) {
+              doDeleteEvent();
+              return;
+            }
+            setDeleteAsk(event.correctionPin ? 'verify' : 'set');
           },
         },
       ]
@@ -344,6 +366,29 @@ export default function SetupScreen() {
           if (removing) doRemove(removing);
           setRemoving(null);
           setRemoveAsk(null);
+        }}
+      />
+
+      <PinModal
+        visible={deleteAsk !== null}
+        mode={deleteAsk === 'set' ? 'set' : 'verify'}
+        eventId={id}
+        record={event.correctionPin}
+        title="Evenement verwijderen"
+        explanation={
+          deleteAsk === 'set'
+            ? 'Er is nog geen correctiecode. Kies er een; die is vanaf nu nodig om te verwijderen.'
+            : 'Voer de code in om dit evenement van deze telefoon te verwijderen.'
+        }
+        onCancel={() => setDeleteAsk(null)}
+        onVerified={() => {
+          setDeleteAsk(null);
+          doDeleteEvent();
+        }}
+        onSet={(record) => {
+          setCorrectionPin(id, record);
+          setDeleteAsk(null);
+          doDeleteEvent();
         }}
       />
 
