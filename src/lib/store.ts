@@ -11,7 +11,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import type { AppEvent, MenuItem, OrderEntry, Person, PinRecord, ShareInfo } from './types';
+import type {
+  AppEvent,
+  MenuItem,
+  OrderEntry,
+  Person,
+  PinRecord,
+  SavedPerson,
+  ShareInfo,
+} from './types';
 
 /** Unique id: the current time in base36 plus 10 random characters. */
 export function newId(): string {
@@ -70,6 +78,11 @@ type StoreState = {
   events: AppEvent[];
   /** The menu that newly created events start from. */
   defaultMenu: MenuItem[];
+  /**
+   * Names kept between events. The same people turn up most weeks, and typing
+   * them in again each time is the slowest part of setting an event up.
+   */
+  defaultPeople: SavedPerson[];
 
   createEvent: (name: string) => string;
   renameEvent: (eventId: string, name: string) => void;
@@ -77,6 +90,13 @@ type StoreState = {
   setEventClosed: (eventId: string, closed: boolean) => void;
 
   addPerson: (eventId: string, name: string) => void;
+  /** Add several names at once, skipping any already in the event. */
+  addPeople: (eventId: string, names: string[]) => void;
+  /**
+   * A placeholder for a sale to someone not on the list, so serving is not
+   * held up by working out who they are. Returns the new person's id.
+   */
+  addUnknownPerson: (eventId: string) => string;
   renamePerson: (eventId: string, personId: string, name: string) => void;
   removePerson: (eventId: string, personId: string) => void;
   setPersonPaid: (eventId: string, personId: string, paid: boolean) => void;
@@ -87,6 +107,10 @@ type StoreState = {
 
   /** Log an order (delta 1) or a correction (delta -1). Always appends. */
   addOrder: (eventId: string, personId: string, itemId: string, delta: number) => void;
+
+  addDefaultPerson: (name: string) => void;
+  renameDefaultPerson: (personId: string, name: string) => void;
+  removeDefaultPerson: (personId: string) => void;
 
   addDefaultItem: (draft: Omit<MenuItem, 'id'>) => void;
   updateDefaultItem: (itemId: string, patch: Partial<Omit<MenuItem, 'id'>>) => void;
@@ -118,6 +142,7 @@ export const useStore = create<StoreState>()(
       deviceName: null,
       events: [],
       defaultMenu: withIds(STARTER_MENU),
+      defaultPeople: [],
 
       createEvent: (name) => {
         const id = newId();
@@ -165,6 +190,37 @@ export const useStore = create<StoreState>()(
             return { ...event, people: [...event.people, person] };
           }),
         }),
+
+      addPeople: (eventId, names) =>
+        set({
+          events: mapEvent(get().events, eventId, (event) => {
+            const taken = new Set(event.people.map((person) => person.name.toLowerCase()));
+            const fresh = names
+              .map((name) => name.trim())
+              .filter((name) => name !== '' && !taken.has(name.toLowerCase()))
+              .map((name) => ({ id: newId(), name, paid: false, paidAt: null }));
+            return { ...event, people: [...event.people, ...fresh] };
+          }),
+        }),
+
+      addUnknownPerson: (eventId) => {
+        const id = newId();
+        set({
+          events: mapEvent(get().events, eventId, (event) => {
+            // Numbered so several unknowns in one evening stay apart until
+            // someone remembers who they were.
+            const used = event.people.filter((person) => /^Onbekend( d+)?$/.test(person.name));
+            const person: Person = {
+              id,
+              name: `Onbekend ${used.length + 1}`,
+              paid: false,
+              paidAt: null,
+            };
+            return { ...event, people: [...event.people, person] };
+          }),
+        });
+        return id;
+      },
 
       renamePerson: (eventId, personId, name) =>
         set({
@@ -255,6 +311,21 @@ export const useStore = create<StoreState>()(
             };
           }),
         }),
+
+      addDefaultPerson: (name) =>
+        set({
+          defaultPeople: [...get().defaultPeople, { id: newId(), name: name.trim() || 'Iemand' }],
+        }),
+
+      renameDefaultPerson: (personId, name) =>
+        set({
+          defaultPeople: get().defaultPeople.map((person) =>
+            person.id === personId ? { ...person, name: name.trim() || person.name } : person
+          ),
+        }),
+
+      removeDefaultPerson: (personId) =>
+        set({ defaultPeople: get().defaultPeople.filter((person) => person.id !== personId) }),
 
       addDefaultItem: (draft) =>
         set({ defaultMenu: [...get().defaultMenu, { ...draft, id: newId() }] }),

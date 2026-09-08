@@ -17,6 +17,12 @@ export type MenuItem = {
   category: Category;
 };
 
+/** A name kept between events, so the same crew is not retyped every time. */
+export type SavedPerson = {
+  id: string;
+  name: string;
+};
+
 /** Someone attending an event. */
 export type Person = {
   id: string;

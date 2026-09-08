@@ -24,6 +24,8 @@ export default function SetupScreen() {
   const setEventClosed = useStore((state) => state.setEventClosed);
   const setCorrectionPin = useStore((state) => state.setCorrectionPin);
   const addPerson = useStore((state) => state.addPerson);
+  const addPeople = useStore((state) => state.addPeople);
+  const defaultPeople = useStore((state) => state.defaultPeople);
   const renamePerson = useStore((state) => state.renamePerson);
   const removePerson = useStore((state) => state.removePerson);
   const addItem = useStore((state) => state.addItem);
@@ -124,6 +126,21 @@ export default function SetupScreen() {
             ))
           )}
           <Button title="Persoon toevoegen" variant="secondary" onPress={() => setAddingPerson(true)} />
+
+          {defaultPeople.length > 0 ? (
+            <Button
+              title={`Vaste namen toevoegen (${
+                defaultPeople.filter(
+                  (saved) =>
+                    !event.people.some(
+                      (person) => person.name.toLowerCase() === saved.name.toLowerCase()
+                    )
+                ).length
+              })`}
+              variant="secondary"
+              onPress={() => addPeople(id, defaultPeople.map((person) => person.name))}
+            />
+          ) : null}
         </View>
 
         <View style={{ gap: space.sm }}>

@@ -122,6 +122,7 @@ export default function EventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const event = useEvent(id);
   const addPerson = useStore((state) => state.addPerson);
+  const addUnknownPerson = useStore((state) => state.addUnknownPerson);
   const [prompting, setPrompting] = useState(false);
   const { status, pending } = useEventSync(event);
 
@@ -164,6 +165,30 @@ export default function EventScreen() {
               pending={pending}
               shared={Boolean(event.share)}
               onPress={() => router.push({ pathname: '/event/[id]/share', params: { id } })}
+            />
+          </View>
+        }
+        ListFooterComponent={
+          <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
+            <Button
+              title="Persoon toevoegen"
+              variant="secondary"
+              onPress={() => setPrompting(true)}
+              style={{ flex: 1 }}
+            />
+            <Button
+              title="Onbekend"
+              variant="secondary"
+              onPress={() => {
+                // For a sale to someone not on the list: record it now, work
+                // out who it was later by renaming them.
+                const personId = addUnknownPerson(id);
+                router.push({
+                  pathname: '/event/[id]/person/[personId]',
+                  params: { id, personId },
+                });
+              }}
+              style={{ flex: 1 }}
             />
           </View>
         }
@@ -222,9 +247,9 @@ export default function EventScreen() {
 
       <BottomBar>
         <Button
-          title="Persoon toevoegen"
+          title="Rondje"
           variant="secondary"
-          onPress={() => setPrompting(true)}
+          onPress={() => router.push({ pathname: '/event/[id]/round', params: { id } })}
           style={{ flex: 1 }}
         />
         <Button
