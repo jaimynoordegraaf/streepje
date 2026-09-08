@@ -9,8 +9,7 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://dazxcqnrklvobabdhgaq.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_DzOaeHHFjmoY9rYRVGfegQ_TMLETvjE",
-        "EXPO_USE_PRECOMPILED_MODULES": "0"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_DzOaeHHFjmoY9rYRVGfegQ_TMLETvjE"
       },
       "ios": {
         "simulator": false
@@ -23,8 +22,7 @@
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://dazxcqnrklvobabdhgaq.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_DzOaeHHFjmoY9rYRVGfegQ_TMLETvjE",
-        "EXPO_USE_PRECOMPILED_MODULES": "0"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_DzOaeHHFjmoY9rYRVGfegQ_TMLETvjE"
       },
       "ios": {
         "simulator": false
@@ -37,8 +35,7 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://dazxcqnrklvobabdhgaq.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_DzOaeHHFjmoY9rYRVGfegQ_TMLETvjE",
-        "EXPO_USE_PRECOMPILED_MODULES": "0"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_DzOaeHHFjmoY9rYRVGfegQ_TMLETvjE"
       },
       "ios": {
         "simulator": false

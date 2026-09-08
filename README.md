@@ -139,13 +139,22 @@ eas build --platform android --profile preview
 That returns a download link for an `.apk`. Android warns about installing
 outside the Play Store, which is expected for your own app.
 
-The build compiles Expo's Android modules **from source** rather than downloading
-prebuilt `.aar` files, via `EXPO_USE_PRECOMPILED_MODULES=0` in `eas.json` and
-`expo.autolinking.android.buildFromSource` in `package.json`. Maven Central
-rate-limited the build machines (HTTP 429) and no build could resolve its
-dependencies. Building from source is slower — roughly 30–40 minutes — but does
-not depend on that repository being reachable. If builds are healthy again and
-you want the speed back, remove both settings.
+Expo downloads its Android modules as prebuilt `.aar` files, which is the fast
+path and the default.
+
+**If a build fails within about three minutes with HTTP 429** on
+`repo.maven.apache.org`, Maven Central is rate-limiting the build machines. That
+is not a fault in this project and usually clears within the hour. If it keeps
+happening, build the modules from source instead — slower, roughly 30–40 minutes,
+but it does not depend on that repository at all:
+
+- `"EXPO_USE_PRECOMPILED_MODULES": "0"` in each `eas.json` build profile, and
+- `"expo": { "autolinking": { "android": { "buildFromSource": [".*"] } } }` in
+  `package.json`
+
+Both were in place through September 2026 for exactly this reason, and were
+removed once Maven Central recovered. Take them out again when it is healthy;
+they cost around fifteen minutes a build.
 
 Credentials reach the build through `env` in `eas.json` rather than `.env`, since
 gitignored files are not uploaded. The publishable key living there is fine: it
