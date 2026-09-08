@@ -74,11 +74,14 @@ function SummaryCard({
 function ShareStrip({
   status,
   pending,
+  unsaved,
   shared,
   onPress,
 }: {
   status: SyncStatus;
   pending: number;
+  /** An edit this phone is holding that the server has not accepted yet. */
+  unsaved: boolean;
   shared: boolean;
   onPress: () => void;
 }) {
@@ -86,6 +89,8 @@ function ShareStrip({
 
   const label = !shared
     ? 'Alleen op deze telefoon'
+    : unsaved
+      ? 'Wijziging nog niet opgeslagen'
     : status === 'live'
       ? 'Verbonden met de andere telefoons'
       : status === 'connecting'
@@ -96,6 +101,8 @@ function ShareStrip({
 
   const dot = !shared
     ? theme.textDim
+    : unsaved
+      ? theme.danger
     : status === 'live'
       ? theme.good
       : status === 'offline'
@@ -125,7 +132,7 @@ export default function EventScreen() {
   const addPerson = useStore((state) => state.addPerson);
   const addUnknownPerson = useStore((state) => state.addUnknownPerson);
   const [prompting, setPrompting] = useState(false);
-  const { status, pending } = useEventSync(event);
+  const { status, pending, detailsPending } = useEventSync(event);
 
   if (!event) {
     return (
@@ -164,6 +171,7 @@ export default function EventScreen() {
             <ShareStrip
               status={status}
               pending={pending}
+              unsaved={detailsPending}
               shared={Boolean(event.share)}
               onPress={() => router.push({ pathname: '/event/[id]/share', params: { id } })}
             />

@@ -25,7 +25,7 @@ export default function ShareScreen() {
   const rememberedName = useStore((state) => state.deviceName);
   const setDeviceName = useStore((state) => state.setDeviceName);
   const bottomInset = useBottomInset();
-  const { status, pending, retry } = useEventSync(event);
+  const { status, pending, detailsPending, retry } = useEventSync(event);
   const { members, meId } = useSessionMembers(event);
   const [busy, setBusy] = useState(false);
   const [naming, setNaming] = useState(false);
@@ -125,6 +125,13 @@ export default function ShareScreen() {
                   {statusLabel}
                 </Text>
               </View>
+              {detailsPending ? (
+                <Text style={{ color: theme.danger, fontSize: 13 }}>
+                  Een wijziging aan namen, prijzen of betalingen staat nog niet op de server.
+                  Turfjes wachten vanzelf, maar dit soort wijzigingen wordt pas bewaard als er
+                  weer verbinding is.
+                </Text>
+              ) : null}
               {pending > 0 ? (
                 <Text style={{ color: theme.textDim, fontSize: 13 }}>
                   {pending} {pending === 1 ? 'bestelling' : 'bestellingen'} nog te versturen. Ze staan

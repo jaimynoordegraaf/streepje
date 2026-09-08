@@ -8,7 +8,7 @@
  * worst.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useStore } from './store';
 import { ensureSignedIn, isSyncConfigured } from './supabase';
@@ -25,6 +25,19 @@ export function useEventSync(event: AppEvent | undefined) {
 
   const [status, setStatus] = useState<SyncStatus>('off');
   const [attempt, setAttempt] = useState(0);
+
+  /**
+   * The version of people, menu and name that the server is known to have.
+   *
+   * Orders can be queued and replayed because they only ever get added. Edits
+   * cannot: pushing them is the one chance to save them. Remembering what was
+   * last accepted gives two things -- something to retry when the connection
+   * returns, and a way to know that the local copy is ahead of the server, so
+   * an incoming update must not be allowed to overwrite it.
+   */
+  const pushedSignature = useRef<string | null>(null);
+  const localSignature = useRef('');
+  const [detailsPending, setDetailsPending] = useState(false);
 
   const eventId = event?.id;
   const shared = Boolean(event?.share) && isSyncConfigured;
@@ -44,6 +57,10 @@ export function useEventSync(event: AppEvent | undefined) {
     [event]
   );
 
+  localSignature.current = detailsSignature;
+  /** True while this phone holds an edit the server has not accepted. */
+  const localIsAhead = () => pushedSignature.current !== localSignature.current;
+
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
 
   // Catch up on what we missed, then listen for what comes next.
@@ -62,7 +79,9 @@ export function useEventSync(event: AppEvent | undefined) {
         const remote = await fetchSession(eventId);
         if (cancelled) return;
 
-        mergeRemoteDetails(eventId, remote);
+        // Entries are safe to merge always: they are only ever added to.
+        // Details are not, so an unsaved local edit wins until it is pushed.
+        if (!localIsAhead()) mergeRemoteDetails(eventId, remote);
         mergeRemoteEntries(eventId, remote.entries);
         noteSynced(eventId);
 
@@ -72,7 +91,7 @@ export function useEventSync(event: AppEvent | undefined) {
             fetchSession(eventId)
               .then((fresh) => {
                 if (cancelled) return;
-                mergeRemoteDetails(eventId, fresh);
+                if (!localIsAhead()) mergeRemoteDetails(eventId, fresh);
                 mergeRemoteEntries(eventId, fresh.entries);
               })
               .catch(() => setStatus('offline'));
@@ -120,9 +139,29 @@ export function useEventSync(event: AppEvent | undefined) {
   // Send edits to people, the menu and the event name.
   useEffect(() => {
     if (status !== 'live' || !event) return;
-    pushDetails(event).catch(() => setStatus('offline'));
-    // Deliberately keyed on the signature rather than the event object, so this
-    // fires when the content changes and not on every unrelated re-render.
+    if (pushedSignature.current === detailsSignature) return;
+
+    let cancelled = false;
+    pushDetails(event)
+      .then(() => {
+        if (cancelled) return;
+        pushedSignature.current = detailsSignature;
+        setDetailsPending(false);
+        noteSynced(event.id);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Left unpushed on purpose. Because status is a dependency, coming
+        // back to 'live' runs this again and the edit goes out then.
+        setDetailsPending(true);
+        setStatus('offline');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // Keyed on the signature rather than the event object, so this fires when
+    // the content changes and not on every unrelated re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, detailsSignature]);
 
@@ -133,7 +172,7 @@ export function useEventSync(event: AppEvent | undefined) {
     return () => clearInterval(timer);
   }, [status, retry]);
 
-  return { status, pending, retry };
+  return { status, pending, detailsPending, retry };
 }
 
 /**
