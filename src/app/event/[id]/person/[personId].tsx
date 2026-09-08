@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, SectionList, View } from 'react-native';
 
+import { CheckIcon, CrossIcon } from '@/components/icons';
 import { PinModal } from '@/components/pin-modal';
 import { Text } from '@/components/text';
 import { Card, EmptyState, Screen, SectionTitle, StepButton, useBottomInset } from '@/components/ui';
@@ -103,7 +104,7 @@ export default function PersonScreen() {
           </View>
 
           <StepButton
-            label="−"
+            icon={(color, size) => <CrossIcon size={size} color={color} />}
             onPress={() => requestRemoval(item)}
             disabled={quantity === 0}
           />
@@ -118,7 +119,7 @@ export default function PersonScreen() {
             {quantity}
           </Text>
           <StepButton
-            label="+"
+            icon={(color, size) => <CheckIcon size={size} color={color} />}
             tone="accent"
             onPress={() => addOrder(id, person.id, item.id, 1)}
           />

@@ -4,6 +4,7 @@ import { FlatList, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/text';
 
+import { CartIcon } from '@/components/icons';
 import { PromptModal } from '@/components/modals';
 import { BottomBar, Button, Card, EmptyState, HeaderButton, Screen } from '@/components/ui';
 import { formatCents } from '@/lib/money';
@@ -205,6 +206,7 @@ export default function EventScreen() {
         />
         <Button
           title="Totalen"
+          icon={(color, size) => <CartIcon size={size} color={color} />}
           onPress={() => router.push({ pathname: '/event/[id]/totals', params: { id } })}
           style={{ flex: 1 }}
         />

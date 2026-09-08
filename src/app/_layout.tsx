@@ -1,12 +1,13 @@
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Pressable, View, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { BackIcon } from '@/components/icons';
 import { useStore } from '@/lib/store';
-import { font, type as typeScale, useTheme } from '@/theme';
+import { font, space, type as typeScale, useTheme } from '@/theme';
 
 /**
  * Loading saved data from storage takes a moment. Until it finishes the store
@@ -17,6 +18,26 @@ function useHydrated(): boolean {
   const [hydrated, setHydrated] = useState(() => useStore.persist.hasHydrated());
   useEffect(() => useStore.persist.onFinishHydration(() => setHydrated(true)), []);
   return hydrated;
+}
+
+/**
+ * The back control, in the brand's own chevron.
+ *
+ * Returns null on the first screen: replacing headerLeft removes the native
+ * back button, so without this check the root would show an arrow that has
+ * nowhere to go.
+ */
+function HeaderBack() {
+  const router = useRouter();
+  const theme = useTheme();
+
+  if (!router.canGoBack()) return null;
+
+  return (
+    <Pressable onPress={() => router.back()} hitSlop={14} style={{ paddingRight: space.md }}>
+      <BackIcon size={20} color={theme.text} />
+    </Pressable>
+  );
 }
 
 export default function RootLayout() {
@@ -62,6 +83,7 @@ export default function RootLayout() {
             fontSize: typeScale.title,
           },
           contentStyle: { backgroundColor: theme.background },
+          headerLeft: () => <HeaderBack />,
         }}
       />
     </SafeAreaProvider>

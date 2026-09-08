@@ -73,12 +73,15 @@ export function Button({
   variant = 'primary',
   disabled = false,
   style,
+  icon,
 }: {
   title: string;
   onPress: () => void;
   variant?: ButtonVariant;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Given the label colour, so the icon always matches the text beside it. */
+  icon?: (color: string, size: number) => ReactNode;
 }) {
   const theme = useTheme();
   const background =
@@ -96,11 +99,15 @@ export function Button({
           borderRadius: radius.md,
           paddingVertical: 14,
           paddingHorizontal: space.lg,
+          flexDirection: 'row',
+          gap: space.sm,
           alignItems: 'center',
+          justifyContent: 'center',
           opacity: disabled ? 0.4 : pressed ? 0.75 : 1,
         },
         style,
       ]}>
+      {icon ? icon(color, 18) : null}
       <Text style={{ color, fontWeight: '700', fontSize: 15 }}>{title}</Text>
     </Pressable>
   );
@@ -108,12 +115,13 @@ export function Button({
 
 /** The round -/+ controls used for counting. */
 export function StepButton({
-  label,
+  icon,
   onPress,
   tone = 'neutral',
   disabled = false,
 }: {
-  label: string;
+  /** Given the resolved foreground colour, so it reads on either tone. */
+  icon: (color: string, size: number) => ReactNode;
   onPress: () => void;
   tone?: 'neutral' | 'accent';
   disabled?: boolean;
@@ -125,23 +133,16 @@ export function StepButton({
       disabled={disabled}
       hitSlop={6}
       style={({ pressed }) => ({
+        // The brand icons carry their own ring, so drawing another circle
+        // behind them gives a double outline. The icon is the button; the box
+        // only exists to keep the tap target comfortable.
         width: 46,
         height: 46,
-        borderRadius: radius.pill,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: tone === 'accent' ? theme.accent : theme.chip,
-        opacity: disabled ? 0.3 : pressed ? 0.7 : 1,
+        opacity: disabled ? 0.3 : pressed ? 0.55 : 1,
       })}>
-      <Text
-        style={{
-          color: tone === 'accent' ? theme.onAccent : theme.text,
-          fontSize: 24,
-          lineHeight: 28,
-          fontWeight: '600',
-        }}>
-        {label}
-      </Text>
+      {icon(tone === 'accent' ? theme.accent : theme.textDim, 38)}
     </Pressable>
   );
 }
