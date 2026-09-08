@@ -235,8 +235,11 @@ export function BottomBar({ children }: { children: ReactNode }) {
 export function HeaderButton({ title, onPress }: { title: string; onPress: () => void }) {
   const theme = useTheme();
   return (
-    <Pressable onPress={onPress} hitSlop={12} style={{ paddingHorizontal: space.xs }}>
-      <Text style={{ color: theme.link, fontSize: 15, fontWeight: '600' }}>{title}</Text>
+    <Pressable onPress={onPress} hitSlop={12} style={{ paddingHorizontal: space.sm }}>
+      {/* One line, so a long word cannot push the title out of the header. */}
+      <Text numberOfLines={1} style={{ color: theme.link, fontSize: 15, fontWeight: '600' }}>
+        {title}
+      </Text>
     </Pressable>
   );
 }

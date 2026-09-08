@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { FlatList, PixelRatio, Pressable, View, useWindowDimensions } from 'react-native';
 
 import { Text } from '@/components/text';
 
@@ -29,16 +29,39 @@ function SummaryCard({
   outstanding: number;
 }) {
   const theme = useTheme();
-  const cell = (label: string, value: number, color: string) => (
-    <View style={{ flex: 1, gap: 2 }}>
-      <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '600' }}>{label}</Text>
-      <Text style={{ color, fontSize: 18, fontWeight: '700' }}>{formatCents(value)}</Text>
-    </View>
-  );
+  const { width } = useWindowDimensions();
+
+  /**
+   * Three columns only survive while the words fit in a third of the card.
+   * With the phone's text size turned up, or on a narrow screen, "Openstaand"
+   * is wider than its column and gets broken mid-word into "Openstaan / d".
+   * Stacking into rows costs a little height and always reads correctly.
+   */
+  const stacked = PixelRatio.getFontScale() > 1.15 || width < 360;
+
+  const cell = (label: string, value: number, color: string) =>
+    stacked ? (
+      <View
+        key={label}
+        style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space.sm }}>
+        <Text style={{ color: theme.textDim, fontSize: 13, fontWeight: '600' }}>{label}</Text>
+        <Text style={{ color, fontSize: 18, fontWeight: '700' }}>{formatCents(value)}</Text>
+      </View>
+    ) : (
+      <View key={label} style={{ flex: 1, gap: 2 }}>
+        <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+        <Text style={{ color, fontSize: 18, fontWeight: '700' }}>{formatCents(value)}</Text>
+      </View>
+    );
 
   return (
     <Card>
-      <View style={{ flexDirection: 'row', gap: space.sm }}>
+      <View
+        style={
+          stacked
+            ? { gap: space.sm }
+            : { flexDirection: 'row', gap: space.sm }
+        }>
         {cell('Totaal', total, theme.text)}
         {cell('Ontvangen', received, theme.good)}
         {cell('Openstaand', outstanding, outstanding > 0 ? theme.danger : theme.textDim)}

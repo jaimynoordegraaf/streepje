@@ -143,8 +143,11 @@ export default function PersonScreen() {
           flexDirection: 'row',
           alignItems: 'baseline',
           justifyContent: 'space-between',
+          gap: space.sm,
         }}>
-        <View style={{ gap: 2 }}>
+        {/* Shrinks first, so a larger phone text size cannot push the amount
+            into it. The amount itself must never wrap. */}
+        <View style={{ gap: 2, flexShrink: 1 }}>
           <Text style={{ color: theme.textDim, fontSize: 14 }}>
             {personItemCount(event, person.id)} consumpties
           </Text>
@@ -154,7 +157,7 @@ export default function PersonScreen() {
             </Text>
           ) : null}
         </View>
-        <Text style={{ color: theme.text, fontSize: 24, fontWeight: '800' }}>
+        <Text numberOfLines={1} style={{ color: theme.text, fontSize: 24, fontWeight: '800' }}>
           {formatCents(personTotalCents(event, person.id))}
         </Text>
       </View>

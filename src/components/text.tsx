@@ -33,6 +33,10 @@ export function Text({ style, ...rest }: TextProps) {
   const { fontWeight, fontStyle, ...rest2 } = flattened;
   return (
     <RNText
+      // The phone's own text-size setting is respected, but bounded. Android
+      // allows well past 2x, which no fixed layout survives; the screens adapt
+      // up to this point and stop there. Pass the prop to override per case.
+      maxFontSizeMultiplier={1.6}
       {...rest}
       style={[rest2, { fontFamily: familyFor(fontWeight, fontStyle === 'italic') }]}
     />
