@@ -106,7 +106,7 @@ export default function EventsScreen() {
           onPress={() => router.push('/join')}
           style={{ flex: 1 }}
         />
-        <Button title="Nieuw evenement" onPress={() => setPrompting(true)} style={{ flex: 2 }} />
+        <Button title="Nieuw evenement" onPress={() => setPrompting(true)} style={{ flex: 1 }} />
       </BottomBar>
 
       <PromptModal

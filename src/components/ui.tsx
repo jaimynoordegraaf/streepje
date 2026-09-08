@@ -98,7 +98,7 @@ export function Button({
           backgroundColor: background,
           borderRadius: radius.md,
           paddingVertical: 14,
-          paddingHorizontal: space.lg,
+          paddingHorizontal: space.md,
           flexDirection: 'row',
           gap: space.sm,
           alignItems: 'center',
@@ -108,7 +108,17 @@ export function Button({
         style,
       ]}>
       {icon ? icon(color, 18) : null}
-      <Text style={{ color, fontWeight: '700', fontSize: 15 }}>{title}</Text>
+      {/* Two things can go wrong in a narrow button. A phrase like "Nieuw
+          evenement" needs to wrap, and a single word like "Deelnemen" cannot
+          wrap at all and would otherwise run straight past the edge. Allowing
+          two lines handles the first; shrinking to fit handles the second. */}
+      <Text
+        numberOfLines={2}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        style={{ color, fontWeight: '700', fontSize: 15, flexShrink: 1, textAlign: 'center' }}>
+        {title}
+      </Text>
     </Pressable>
   );
 }
