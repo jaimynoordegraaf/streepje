@@ -175,5 +175,14 @@ phone's screen.
   pulls all 18 weights, and one unresolved file among them breaks the bundle.
 - **A closed `Modal` leaves its backdrop painted on web,** so closed modals are
   unmounted rather than merely hidden.
+- **The phone's own text size changes the layout.** React Native honours it and
+  Samsung puts it front and centre, so screens must survive roughly 1.6x text.
+  It is bounded in `components/text.tsx`; the event summary stacks into rows
+  once it passes 1.15. Test by shrinking the window, which has the same effect
+  on the text-to-container ratio.
+- **A single-word button label cannot wrap.** "Deelnemen" ran past the edge of
+  its button rather than breaking. `Button` now allows two lines and shrinks to
+  fit below that. Give paired buttons equal flex unless you have checked the
+  longest label at the narrowest width.
 - **Node may be missing from a shell's PATH on Windows** even when installed.
   It lives in `C:\Program Files\nodejs`; check there before concluding it is absent.
