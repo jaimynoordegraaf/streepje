@@ -8,7 +8,10 @@
     "scheme": "streepje",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.scoutingjwf.streepje"
+      "bundleIdentifier": "com.scoutingjwf.streepje",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
