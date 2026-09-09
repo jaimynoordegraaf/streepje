@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Keep the date on the privacy policy honest.
+#
+# The page says "laatst bijgewerkt op <date>". That line is a claim about when
+# the policy last changed, and a stale one is worse than none: it tells a
+# reader the terms have not moved when they have. Remembering to edit it by
+# hand is exactly the kind of thing nobody remembers.
+#
+# So: whenever docs/privacy.html is part of a commit, its date becomes today.
+#
+# Enable it once per clone -- hooks are not carried by git itself:
+#
+#   git config core.hooksPath .githooks
+
+set -e
+
+page="docs/privacy.html"
+
+# Nothing to do unless the policy is actually part of this commit.
+if ! git diff --cached --name-only | grep -qx "$page"; then
+  exit 0
+fi
+
+months="januari februari maart april mei juni juli augustus september oktober november december"
+month_number=$(date +%m)
+# %m is zero padded, and a leading zero makes the shell read 08 and 09 as
+# invalid octal. Strip it before counting into the list.
+month_name=$(echo "$months" | cut -d' ' -f"${month_number#0}")
+today="$(date +%-d) $month_name $(date +%Y)"
+
+current=$(sed -n 's/.*Laatst bijgewerkt op \([^<]*\)<.*/\1/p' "$page")
+
+if [ "$current" = "$today" ]; then
+  exit 0
+fi
+
+sed -i "s|Laatst bijgewerkt op [^<]*<|Laatst bijgewerkt op $today<|" "$page"
+git add "$page"
+
+echo "privacy policy dated $today (was: ${current:-unset})"
