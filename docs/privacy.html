@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacyverklaring — streepje</title>
+<style>
+  :root {
+    --ink: #161616;
+    --dim: #5C5C60;
+    --line: #E3E3E6;
+    --paper: #F5F5F6;
+    --card: #FFFFFF;
+    --accent: #F15A24;
+    --link: #1F6FA8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Montserrat, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+  }
+  main { max-width: 680px; margin: 0 auto; }
+  h1 {
+    font-size: 34px;
+    line-height: 1.15;
+    margin: 0 0 4px;
+    letter-spacing: -0.5px;
+  }
+  h1 em { color: var(--accent); font-style: italic; }
+  .updated { color: var(--dim); font-size: 14px; margin: 0 0 32px; }
+  h2 {
+    font-size: 20px;
+    margin: 36px 0 8px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+  p, li { margin: 0 0 12px; }
+  ul { padding-left: 20px; }
+  a { color: var(--link); }
+  .lead {
+    background: var(--card);
+    border-left: 4px solid var(--accent);
+    padding: 16px 18px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .lead p:last-child { margin-bottom: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 4px 0 16px; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; }
+  footer { margin-top: 44px; color: var(--dim); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Privacyverklaring <em>streepje</em></h1>
+<p class="updated">Laatst bijgewerkt op 9 september 2026</p>
+
+<div class="lead">
+  <p><strong>streepje</strong> houdt bij wie op een evenement wat gedronken en gegeten heeft, en
+  wie er aan het eind nog moet betalen. De app is gemaakt voor en door
+  Scouting Jan Willem Friso.</p>
+  <p>Standaard blijft alles op de telefoon zelf staan. Er is geen account, er zit geen
+  advertentie- of analysecode in, en er wordt niets over je gedrag verzameld.</p>
+</div>
+
+<h2>Wanneer er iets wordt opgeslagen buiten de telefoon</h2>
+
+<p>Alleen als iemand <em>Delen</em> aanzet. Dat is nodig om met meerdere telefoons tegelijk
+te kunnen turven: alle telefoons kijken dan naar dezelfde lijst. Zonder delen werkt de app
+volledig, en verlaat er geen enkel gegeven het toestel.</p>
+
+<p>Zodra er gedeeld wordt, gaat het om deze gegevens:</p>
+
+<table>
+  <tr>
+    <th>Wat</th>
+    <th>Waarom</th>
+  </tr>
+  <tr>
+    <td>Namen van de deelnemers en de naam van het evenement</td>
+    <td>Om te weten wie wat besteld heeft en wie nog moet betalen</td>
+  </tr>
+  <tr>
+    <td>De naam die een telefoon zichzelf geeft</td>
+    <td>Zodat te zien is welke telefoon een turf heeft weggehaald</td>
+  </tr>
+  <tr>
+    <td>Wat er geturfd is, en wat er betaald is, in centen</td>
+    <td>Dat is waar de app voor bestaat</td>
+  </tr>
+  <tr>
+    <td>Een willekeurig nummer per telefoon en een anonieme sessie-id</td>
+    <td>Om bestellingen van verschillende telefoons uit elkaar te houden</td>
+  </tr>
+</table>
+
+<p>Er wordt geen naam, e-mailadres, telefoonnummer of locatie van de gebruiker zelf
+gevraagd of opgeslagen. Er is geen inlog.</p>
+
+<h2>Waar het staat</h2>
+
+<p>De gedeelde lijst staat op een database van
+<a href="https://supabase.com/privacy">Supabase</a>, die als verwerker namens ons optreedt,
+op servers in [REGIO INVULLEN]. De verbinding is altijd versleuteld (HTTPS).
+Alleen telefoons die de zescijferige code hebben gescand of ingetypt, kunnen bij een lijst.
+De database controleert dat zelf, per lijst.</p>
+
+<h2>Hoe lang het bewaard blijft</h2>
+
+<p>Tot het verwijderd wordt. De telefoon die het delen gestart is, kan onder
+<em>Delen → Gedeelde lijst verwijderen</em> alle namen en turfjes van de server wissen.
+Elke telefoon houdt daarna zijn eigen kopie, zodat er niets van de administratie verloren
+gaat.</p>
+
+<p>Ons advies: wis de gedeelde lijst zodra het evenement is afgerekend, en exporteer
+eerst de CSV als je de gegevens nog nodig hebt.</p>
+
+<h2>De camera</h2>
+
+<p>De app vraagt toegang tot de camera om één ding: een QR-code lezen om aan een gedeelde
+lijst deel te nemen. Er wordt geen foto of video opgenomen, opgeslagen of verstuurd.</p>
+
+<h2>Delen met anderen</h2>
+
+<p>Wij verkopen niets, delen niets met adverteerders en gebruiken geen trackers. De
+gegevens gaan alleen naar Supabase, omdat die de database levert waarop de gedeelde lijst
+staat.</p>
+
+<p>Als je zelf een CSV of een samenvatting exporteert en die deelt, bepaal je zelf met wie.
+Dat gaat buiten de app om.</p>
+
+<h2>Namen van kinderen</h2>
+
+<p>Op een scoutingevenement staan er vaak namen van minderjarigen op de lijst. Gebruik
+daarom liefst alleen voornamen of bijnamen — meer heeft de app niet nodig om te werken.</p>
+
+<h2>Je rechten</h2>
+
+<p>Je hebt het recht om te weten welke gegevens over je zijn vastgelegd, om ze te laten
+verbeteren en om ze te laten wissen. In de praktijk is dat kort: vraag de organisator van
+het evenement om de gedeelde lijst te verwijderen, of neem contact met ons op via het
+adres hieronder. Wij reageren binnen 30 dagen.</p>
+
+<h2>Wijzigingen</h2>
+
+<p>Verandert er iets aan wat de app opslaat, dan passen we deze verklaring aan en
+veranderen we de datum bovenaan.</p>
+
+<h2>Contact</h2>
+
+<p>Scouting Jan Willem Friso<br>
+[E-MAILADRES INVULLEN]</p>
+
+<footer>
+  streepje is gemaakt voor Scouting Jan Willem Friso.
+</footer>
+
+</main>
+</body>
+</html>
