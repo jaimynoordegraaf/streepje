@@ -12,10 +12,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useStore } from './store';
 import { ensureSignedIn, isSyncConfigured } from './supabase';
-import { fetchMembers, fetchSession, pushDetails, pushEntries, subscribeToSession } from './sync';
+import {
+  fetchMembers,
+  fetchSession,
+  pushDetails,
+  pushEntries,
+  SessionGoneError,
+  subscribeToSession,
+} from './sync';
 import type { AppEvent, SessionMember } from './types';
 
-export type SyncStatus = 'off' | 'connecting' | 'live' | 'offline';
+/**
+ * `gone` is not a kind of `offline`. Offline means keep queueing and keep
+ * trying; gone means the shared copy has been deleted and never coming back,
+ * so the phone should say so instead of pretending it is still catching up.
+ */
+export type SyncStatus = 'off' | 'connecting' | 'live' | 'offline' | 'gone';
 
 export function useEventSync(event: AppEvent | undefined) {
   const mergeRemoteEntries = useStore((state) => state.mergeRemoteEntries);
@@ -94,13 +106,15 @@ export function useEventSync(event: AppEvent | undefined) {
                 if (!localIsAhead()) mergeRemoteDetails(eventId, fresh);
                 mergeRemoteEntries(eventId, fresh.entries);
               })
-              .catch(() => setStatus('offline'));
+              .catch((error) => {
+                if (!cancelled) setStatus(error instanceof SessionGoneError ? 'gone' : 'offline');
+              });
           },
         });
 
         if (!cancelled) setStatus('live');
-      } catch {
-        if (!cancelled) setStatus('offline');
+      } catch (error) {
+        if (!cancelled) setStatus(error instanceof SessionGoneError ? 'gone' : 'offline');
       }
     };
 

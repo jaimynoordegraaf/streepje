@@ -5,11 +5,13 @@ import QRCode from 'react-native-qrcode-svg';
 
 import { Text } from '@/components/text';
 import { PromptModal } from '@/components/modals';
+import { PinModal } from '@/components/pin-modal';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { describeError } from '@/lib/errors';
+import { correctionsUnlocked, isHostDevice } from '@/lib/pin';
 import { newJoinCode, useEvent, useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
-import { hostSession, setMemberName } from '@/lib/sync';
+import { deleteSharedSession, hostSession, setMemberName } from '@/lib/sync';
 import { useEventSync, useSessionMembers } from '@/lib/use-sync';
 import { formatDateTime } from '@/lib/export';
 import { radius, space, useTheme } from '@/theme';
@@ -22,6 +24,7 @@ export default function ShareScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const event = useEvent(id);
   const setShare = useStore((state) => state.setShare);
+  const setCorrectionPin = useStore((state) => state.setCorrectionPin);
   const rememberedName = useStore((state) => state.deviceName);
   const setDeviceName = useStore((state) => state.setDeviceName);
   const bottomInset = useBottomInset();
@@ -29,6 +32,7 @@ export default function ShareScreen() {
   const { members, meId } = useSessionMembers(event);
   const [busy, setBusy] = useState(false);
   const [naming, setNaming] = useState(false);
+  const [wipeAsk, setWipeAsk] = useState<'verify' | 'set' | null>(null);
 
   if (!event) {
     return (
@@ -68,6 +72,49 @@ export default function ShareScreen() {
       ]
     );
 
+  /**
+   * Wipe the shared copy from the server, leaving every phone's own copy alone.
+   *
+   * Guarded like every other destructive action: host phone, correction code.
+   * This one deletes other people's data as well as your own, so if anything
+   * deserves the code, it is this.
+   */
+  const doWipe = async () => {
+    setBusy(true);
+    try {
+      await deleteSharedSession(id);
+      setShare(id, null);
+      Alert.alert(
+        'Gedeelde lijst verwijderd',
+        'De gegevens staan niet meer op de server. Dit evenement staat nog gewoon op deze telefoon, en op de andere telefoons blijft hun eigen kopie staan.'
+      );
+    } catch (error) {
+      Alert.alert('Verwijderen mislukt', describeError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmWipe = () =>
+    Alert.alert(
+      'Gedeelde lijst verwijderen?',
+      'Alle namen en turfjes worden van de server gewist, ook voor de andere telefoons. Wat op deze telefoon staat blijft staan. Exporteer eerst als je de gegevens nog nodig hebt.',
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        {
+          text: 'Verwijderen',
+          style: 'destructive',
+          onPress: () => {
+            if (correctionsUnlocked(id)) {
+              doWipe();
+              return;
+            }
+            setWipeAsk(event.correctionPin ? 'verify' : 'set');
+          },
+        },
+      ]
+    );
+
   const statusLabel =
     status === 'live'
       ? 'Verbonden'
@@ -75,10 +122,16 @@ export default function ShareScreen() {
         ? 'Verbinden…'
         : status === 'offline'
           ? 'Offline — bestellingen worden op deze telefoon bewaard'
-          : 'Niet gedeeld';
+          : status === 'gone'
+            ? 'De gedeelde lijst is verwijderd. Wat op deze telefoon staat blijft staan.'
+            : 'Niet gedeeld';
 
   const statusColor =
-    status === 'live' ? theme.good : status === 'offline' ? theme.danger : theme.textDim;
+    status === 'live'
+      ? theme.good
+      : status === 'offline' || status === 'gone'
+        ? theme.danger
+        : theme.textDim;
 
   return (
     <Screen>
@@ -168,7 +221,27 @@ export default function ShareScreen() {
               </Card>
             </View>
 
-            <Button title="Stoppen met delen op deze telefoon" variant="danger" onPress={stopSharing} />
+            <View style={{ gap: space.sm }}>
+              <Button
+                title="Stoppen met delen op deze telefoon"
+                variant="danger"
+                onPress={stopSharing}
+              />
+              {isHostDevice(event) ? (
+                <>
+                  <Button
+                    title={busy ? 'Bezig…' : 'Gedeelde lijst verwijderen'}
+                    variant="danger"
+                    disabled={busy}
+                    onPress={confirmWipe}
+                  />
+                  <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 18 }}>
+                    Wist de namen en turfjes van de server, voor iedereen. Elke telefoon houdt
+                    zijn eigen kopie, dus er gaat niets verloren van wat er al geturfd is.
+                  </Text>
+                </>
+              ) : null}
+            </View>
           </>
         ) : (
           <Card style={{ gap: space.md }}>
@@ -199,6 +272,29 @@ export default function ShareScreen() {
         onSubmit={(value) => {
           setNaming(false);
           startSharing(value);
+        }}
+      />
+
+      <PinModal
+        visible={wipeAsk !== null}
+        mode={wipeAsk === 'set' ? 'set' : 'verify'}
+        eventId={id}
+        record={event.correctionPin}
+        title="Gedeelde lijst verwijderen"
+        explanation={
+          wipeAsk === 'set'
+            ? 'Er is nog geen correctiecode. Kies er een; die is vanaf nu nodig om te verwijderen.'
+            : 'Voer de code in om de gedeelde lijst van de server te wissen.'
+        }
+        onCancel={() => setWipeAsk(null)}
+        onVerified={() => {
+          setWipeAsk(null);
+          doWipe();
+        }}
+        onSet={(record) => {
+          setCorrectionPin(id, record);
+          setWipeAsk(null);
+          doWipe();
         }}
       />
     </Screen>

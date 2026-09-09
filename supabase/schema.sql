@@ -113,6 +113,22 @@ begin
 end;
 $$;
 
+-- Deleting a shared list, so an event's data need not outlive the event.
+-- Host only: the sessions row cascades to everything else, so this erases the
+-- whole order log, which is the one thing a guest phone must never be able to
+-- do.
+create or replace function public.delete_session(p_session_id text)
+returns void language plpgsql security definer
+set search_path = public as $$
+begin
+  if not public.is_host(p_session_id) then
+    raise exception 'Only the host may delete this session';
+  end if;
+
+  delete from public.sessions where id = p_session_id;
+end;
+$$;
+
 -- ------------------------------------------------------------- policies ----
 
 alter table public.sessions        enable row level security;
@@ -121,9 +137,17 @@ alter table public.session_people  enable row level security;
 alter table public.session_items   enable row level security;
 alter table public.order_entries   enable row level security;
 
+-- Members read and update; nobody deletes directly. Deletion goes through
+-- delete_session above, which checks who is asking.
 drop policy if exists sessions_rw on public.sessions;
-create policy sessions_rw on public.sessions
-  for all using (public.is_member(id)) with check (public.is_member(id));
+
+drop policy if exists sessions_read on public.sessions;
+create policy sessions_read on public.sessions
+  for select using (public.is_member(id));
+
+drop policy if exists sessions_update on public.sessions;
+create policy sessions_update on public.sessions
+  for update using (public.is_member(id)) with check (public.is_member(id));
 
 drop policy if exists members_read on public.session_members;
 create policy members_read on public.session_members

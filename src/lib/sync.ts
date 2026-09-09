@@ -194,6 +194,34 @@ export async function joinSession(joinCode: string): Promise<string> {
   return data as string;
 }
 
+/**
+ * The shared copy is gone, because the host deleted it.
+ *
+ * This gets its own type rather than being one more failure, because "deleted"
+ * and "no signal" deserve opposite responses on a guest phone: one is worth
+ * retrying forever, the other never is.
+ */
+export class SessionGoneError extends Error {
+  constructor() {
+    super('De gedeelde lijst is verwijderd door de telefoon die hem deelde.');
+    this.name = 'SessionGoneError';
+  }
+}
+
+/**
+ * Delete the shared copy of an event, for everybody.
+ *
+ * Only the host may do this and the database checks that rather than trusting
+ * the caller. Every phone keeps its own local copy, so this clears the server
+ * without anyone losing what they turfed.
+ */
+export async function deleteSharedSession(sessionId: string): Promise<void> {
+  await ensureSignedIn();
+  const db = client();
+  const { error } = await db.rpc('delete_session', { p_session_id: sessionId });
+  if (error) throw error;
+}
+
 export type RemoteSession = {
   name: string;
   createdAt: number;
@@ -208,7 +236,7 @@ export async function fetchSession(sessionId: string): Promise<RemoteSession> {
   const db = client();
 
   const [session, people, items, entries] = await Promise.all([
-    db.from('sessions').select('name, closed, created_at').eq('id', sessionId).single(),
+    db.from('sessions').select('name, closed, created_at').eq('id', sessionId).maybeSingle(),
     db.from('session_people').select('*').eq('session_id', sessionId),
     db.from('session_items').select('*').eq('session_id', sessionId),
     db.from('order_entries').select('*').eq('session_id', sessionId),
@@ -216,7 +244,9 @@ export async function fetchSession(sessionId: string): Promise<RemoteSession> {
 
   const failure = session.error ?? people.error ?? items.error ?? entries.error;
   if (failure) throw failure;
-  if (!session.data) throw new Error('Die sessie bestaat niet meer.');
+  // maybeSingle rather than single: a missing row is a deleted session, which
+  // is an answer, not a database error.
+  if (!session.data) throw new SessionGoneError();
 
   return {
     name: session.data.name,
