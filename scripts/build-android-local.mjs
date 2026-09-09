@@ -75,6 +75,30 @@ if (!fs.existsSync(keystore) || !fs.existsSync(credsFile)) {
 }
 const creds = JSON.parse(fs.readFileSync(credsFile, 'utf8'));
 
+// Play enrols one upload certificate per listing and rejects anything signed
+// with another, so check the key before spending twelve minutes on a bundle
+// that cannot be uploaded. The expected fingerprint is in the rejection message
+// Play shows, and in signing/upload.json.
+function fingerprintOf(keystorePath) {
+  const listed = execFileSync(
+    path.join(javaHome, 'bin', 'keytool.exe'),
+    ['-list', '-v', '-keystore', keystorePath, '-storepass', creds.storePassword, '-alias', creds.keyAlias],
+    { encoding: 'utf8' }
+  );
+  const match = listed.match(/SHA1:\s*([0-9A-F:]+)/);
+  return match ? match[1] : null;
+}
+
+const sha1 = fingerprintOf(keystore);
+if (creds.expectedSha1 && sha1 && sha1 !== creds.expectedSha1) {
+  fail(
+    'signing/upload.jks is not the key Play expects.\n' +
+      '  expected ' + creds.expectedSha1 + '\n' +
+      '  found    ' + sha1 + '\n' +
+      'Play rejects a bundle signed with any other key. Export the right one from EAS.'
+  );
+}
+
 console.log('JDK          ' + javaHome);
 console.log('Android SDK  ' + androidHome);
 console.log('versionCode  ' + versionCode + '\n');
@@ -192,15 +216,4 @@ if (!fs.existsSync(aab)) {
 const size = (fs.statSync(aab).size / 1024 / 1024).toFixed(1);
 console.log('\n' + aab);
 console.log(size + ' MB, versionCode ' + versionCode);
-
-try {
-  const listed = execFileSync(
-    path.join(javaHome, 'bin', 'keytool.exe'),
-    ['-list', '-v', '-keystore', keystore, '-storepass', creds.storePassword, '-alias', creds.keyAlias],
-    { encoding: 'utf8' }
-  );
-  const fingerprint = listed.match(/SHA1:\s*([0-9A-F:]+)/);
-  if (fingerprint) console.log('signed with SHA1 ' + fingerprint[1]);
-} catch {
-  // Not worth failing a good build over a missing fingerprint.
-}
+if (sha1) console.log('signed with SHA1 ' + sha1);
