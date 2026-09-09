@@ -201,8 +201,12 @@ buildGradle = replaceOnce(
 
 fs.writeFileSync(buildGradlePath, buildGradle);
 
-// 5. Build.
-run(path.join(androidDir, 'gradlew.bat'), ['bundleRelease'], {
+// 5. Build. --console=plain because the animated progress bar redraws every
+//    second and a Windows terminal keeps every frame, burying the few lines
+//    that matter under thousands of "92% EXECUTING". The Kotlin deprecation
+//    warnings that remain come from Expo's own sources compiling against
+//    React Native 0.86, and are not ours to fix.
+run(path.join(androidDir, 'gradlew.bat'), ['bundleRelease', '--console=plain'], {
   cwd: androidDir,
   env: { ...process.env, JAVA_HOME: javaHome, ANDROID_HOME: androidHome },
 });
