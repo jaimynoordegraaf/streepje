@@ -44,3 +44,6 @@ example
 
 # local secrets
 .env
+
+# Local release signing: the upload key, never commit it
+/signing
