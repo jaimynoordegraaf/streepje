@@ -18,9 +18,26 @@ import { Text } from './text';
 
 import { font, radius, space, useTheme } from '@/theme';
 
+/**
+ * How wide the content is ever allowed to get.
+ *
+ * Every phone is narrower than this, so on a phone nothing changes at all. It
+ * exists for the iPad, where letting a list of names stretch across thirteen
+ * inches would leave a name at one edge and its total at the other, with a
+ * hand's width of nothing between them. A column you can read in one glance
+ * beats filling the glass.
+ */
+const contentMaxWidth = 640;
+
 export function Screen({ children }: { children: ReactNode }) {
   const theme = useTheme();
-  return <View style={{ flex: 1, backgroundColor: theme.background }}>{children}</View>;
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <View style={{ flex: 1, width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center' }}>
+        {children}
+      </View>
+    </View>
+  );
 }
 
 export function Card({
