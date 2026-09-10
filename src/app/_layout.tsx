@@ -2,7 +2,7 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, View, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BackIcon } from '@/components/icons';
@@ -74,7 +74,15 @@ export default function RootLayout() {
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: theme.card },
+          // Android gets a painted bar. iOS gets its own, deliberately.
+          //
+          // From iOS 26 the system draws every navigation bar button inside a
+          // Liquid Glass capsule, made from a material we cannot colour and
+          // cannot switch off. Painting the bar underneath it left the capsule
+          // flashing pale behind the back arrow on a near-black bar. The
+          // system's own bar is within a shade of theme.card in both light and
+          // dark, and the capsule is designed against it.
+          headerStyle: Platform.OS === 'ios' ? undefined : { backgroundColor: theme.card },
           headerTintColor: theme.text,
           // Bold italic, matching the logotype.
           headerTitleStyle: {
