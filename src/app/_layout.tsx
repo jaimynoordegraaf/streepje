@@ -1,8 +1,8 @@
 import { useFonts } from 'expo-font';
-import { Stack, useRouter } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Pressable, View, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BackIcon } from '@/components/icons';
@@ -69,31 +69,54 @@ export default function RootLayout() {
     );
   }
 
+  /**
+   * The navigation theme, which is not the same thing as ours.
+   *
+   * Without this the navigator runs on its light default whatever the phone is
+   * set to. Painting headerStyle hid that for a long time, but it hid it only
+   * from us: iOS still took the bar to be a light one, and from iOS 26 it
+   * draws navigation bar buttons inside a Liquid Glass capsule built for the
+   * bar it believes is underneath. A light capsule on a near-black bar is what
+   * the back arrow was flashing.
+   *
+   * Telling the navigator which mode it is in settles both, and the standard
+   * greys give way to the streepje palette while we are here.
+   */
+  const dark = scheme === 'dark';
+  const base = dark ? DarkTheme : DefaultTheme;
+  const navigationTheme = {
+    ...base,
+    dark,
+    colors: {
+      ...base.colors,
+      primary: theme.accent,
+      background: theme.background,
+      card: theme.card,
+      text: theme.text,
+      border: theme.border,
+      notification: theme.accent,
+    },
+  };
+
   return (
     <SafeAreaProvider>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          // Android gets a painted bar. iOS gets its own, deliberately.
-          //
-          // From iOS 26 the system draws every navigation bar button inside a
-          // Liquid Glass capsule, made from a material we cannot colour and
-          // cannot switch off. Painting the bar underneath it left the capsule
-          // flashing pale behind the back arrow on a near-black bar. The
-          // system's own bar is within a shade of theme.card in both light and
-          // dark, and the capsule is designed against it.
-          headerStyle: Platform.OS === 'ios' ? undefined : { backgroundColor: theme.card },
-          headerTintColor: theme.text,
-          // Bold italic, matching the logotype.
-          headerTitleStyle: {
-            color: theme.text,
-            fontFamily: font.displayItalic,
-            fontSize: typeScale.title,
-          },
-          contentStyle: { backgroundColor: theme.background },
-          headerLeft: () => <HeaderBack />,
-        }}
-      />
+      <StatusBar style={dark ? 'light' : 'dark'} />
+      <ThemeProvider value={navigationTheme}>
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: theme.card },
+            headerTintColor: theme.text,
+            // Bold italic, matching the logotype.
+            headerTitleStyle: {
+              color: theme.text,
+              fontFamily: font.displayItalic,
+              fontSize: typeScale.title,
+            },
+            contentStyle: { backgroundColor: theme.background },
+            headerLeft: () => <HeaderBack />,
+          }}
+        />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
