@@ -53,7 +53,23 @@ export default function RoundScreen() {
   };
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <BottomBar>
+          <Button
+            title={
+              ready
+                ? `${chosen.length}× ${item.name} · ${formatCents(chosen.length * item.priceCents)}`
+                : item === null
+                  ? 'Kies eerst wat'
+                  : 'Kies voor wie'
+            }
+            disabled={!ready}
+            onPress={confirm}
+            style={{ flex: 1 }}
+          />
+        </BottomBar>
+      }>
       <Stack.Screen options={{ title: 'Rondje' }} />
 
       <FlatList
@@ -146,20 +162,6 @@ export default function RoundScreen() {
         }}
       />
 
-      <BottomBar>
-        <Button
-          title={
-            ready
-              ? `${chosen.length}× ${item.name} · ${formatCents(chosen.length * item.priceCents)}`
-              : item === null
-                ? 'Kies eerst wat'
-                : 'Kies voor wie'
-          }
-          disabled={!ready}
-          onPress={confirm}
-          style={{ flex: 1 }}
-        />
-      </BottomBar>
     </Screen>
   );
 }

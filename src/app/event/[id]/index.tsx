@@ -145,7 +145,23 @@ export default function EventScreen() {
   }
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <BottomBar>
+          <Button
+            title="Rondje"
+            variant="secondary"
+            onPress={() => router.push({ pathname: '/event/[id]/round', params: { id } })}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title="Totalen"
+            icon={(color, size) => <CartIcon size={size} color={color} />}
+            onPress={() => router.push({ pathname: '/event/[id]/totals', params: { id } })}
+            style={{ flex: 1 }}
+          />
+        </BottomBar>
+      }>
       <Stack.Screen
         options={{
           title: event.name,
@@ -254,21 +270,6 @@ export default function EventScreen() {
           );
         }}
       />
-
-      <BottomBar>
-        <Button
-          title="Rondje"
-          variant="secondary"
-          onPress={() => router.push({ pathname: '/event/[id]/round', params: { id } })}
-          style={{ flex: 1 }}
-        />
-        <Button
-          title="Totalen"
-          icon={(color, size) => <CartIcon size={size} color={color} />}
-          onPress={() => router.push({ pathname: '/event/[id]/totals', params: { id } })}
-          style={{ flex: 1 }}
-        />
-      </BottomBar>
 
       <PromptModal
         visible={prompting}

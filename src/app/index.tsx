@@ -71,7 +71,18 @@ export default function EventsScreen() {
   const [prompting, setPrompting] = useState(false);
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <BottomBar>
+          <Button
+            title="Deelnemen"
+            variant="secondary"
+            onPress={() => router.push('/join')}
+            style={{ flex: 1 }}
+          />
+          <Button title="Nieuw evenement" onPress={() => setPrompting(true)} style={{ flex: 1 }} />
+        </BottomBar>
+      }>
       <Stack.Screen
         options={{
           title: 'Evenementen',
@@ -98,16 +109,6 @@ export default function EventsScreen() {
           />
         )}
       />
-
-      <BottomBar>
-        <Button
-          title="Deelnemen"
-          variant="secondary"
-          onPress={() => router.push('/join')}
-          style={{ flex: 1 }}
-        />
-        <Button title="Nieuw evenement" onPress={() => setPrompting(true)} style={{ flex: 1 }} />
-      </BottomBar>
 
       <PromptModal
         visible={prompting}

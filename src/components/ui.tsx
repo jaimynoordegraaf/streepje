@@ -29,13 +29,18 @@ import { font, radius, space, useTheme } from '@/theme';
  */
 const contentMaxWidth = 640;
 
-export function Screen({ children }: { children: ReactNode }) {
+export function Screen({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   const theme = useTheme();
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <View style={{ flex: 1, width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center' }}>
         {children}
       </View>
+      {/* Outside the column on purpose. A BottomBar paints a background and a
+          top border, and a bar that stops two thirds of the way across an iPad
+          looks like a rendering fault rather than a choice. It centres its own
+          buttons instead. */}
+      {footer}
     </View>
   );
 }
@@ -237,23 +242,36 @@ export function useBottomInset(): number {
   return useSafeAreaInsets().bottom;
 }
 
-/** A fixed bar at the bottom of a screen, clear of the system navigation bar. */
+/**
+ * A fixed bar at the bottom of a screen, clear of the system navigation bar.
+ *
+ * Pass it to Screen's `footer`, not as a child: the background and the top
+ * border run the full width of the glass, while the buttons themselves stay in
+ * the same column as the content above them.
+ */
 export function BottomBar({ children }: { children: ReactNode }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   return (
     <View
       style={{
-        flexDirection: 'row',
-        gap: space.sm,
-        paddingHorizontal: space.lg,
-        paddingTop: space.lg,
-        paddingBottom: space.lg + insets.bottom,
         borderTopWidth: 1,
         borderTopColor: theme.border,
         backgroundColor: theme.card,
       }}>
-      {children}
+      <View
+        style={{
+          width: '100%',
+          maxWidth: contentMaxWidth,
+          alignSelf: 'center',
+          flexDirection: 'row',
+          gap: space.sm,
+          paddingHorizontal: space.lg,
+          paddingTop: space.lg,
+          paddingBottom: space.lg + insets.bottom,
+        }}>
+        {children}
+      </View>
     </View>
   );
 }
