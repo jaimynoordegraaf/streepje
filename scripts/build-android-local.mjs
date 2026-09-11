@@ -22,6 +22,12 @@ const BACKSLASH = String.fromCharCode(92);
 const root = path.resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
 const clean = args.includes('--clean');
+// R8 is on for releases: Play's app-optimization check wants it, and it takes
+// a few megabytes off the dex. It is also the one setting here that can break
+// a working app -- React Native and Expo reach classes by reflection, and what
+// R8 removes it removes silently. --no-minify builds the same bundle without
+// it, to tell "R8 broke this" apart from "this was already broken".
+const minify = !args.includes('--no-minify');
 const versionCodeArg = args.find((a) => a.startsWith('--version-code=')) ?? '--version-code=2';
 const versionCode = Number(versionCodeArg.split('=')[1]);
 
@@ -151,6 +157,11 @@ fs.appendFileSync(
     'UPLOAD_STORE_PASSWORD=' + creds.storePassword,
     'UPLOAD_KEY_ALIAS=' + creds.keyAlias,
     'UPLOAD_KEY_PASSWORD=' + creds.keyPassword,
+    // Resource shrinking stays off. It is a separate switch from minification,
+    // it does nothing for the obfuscation figure Play asks about, and it drops
+    // resources that are only ever looked up by name -- a second way to break
+    // the app for no gain here, where the bulk of the download is native code.
+    'android.enableMinifyInReleaseBuilds=' + String(minify),
     '',
   ].join('\n')
 );
@@ -221,3 +232,20 @@ const size = (fs.statSync(aab).size / 1024 / 1024).toFixed(1);
 console.log('\n' + aab);
 console.log(size + ' MB, versionCode ' + versionCode);
 if (sha1) console.log('signed with SHA1 ' + sha1);
+
+// 7. When R8 ran, check its mapping file made it into the bundle. Without it
+//    Play shows crash reports in renamed classes, which is the moment you most
+//    need the real names.
+if (minify) {
+  const mapping = path.join(
+    appDir, 'build', 'outputs', 'mapping', 'release', 'mapping.txt'
+  );
+  if (fs.existsSync(mapping)) {
+    const lines = fs.readFileSync(mapping, 'utf8').split('\n').length;
+    console.log('minified, mapping.txt has ' + lines.toLocaleString('en') + ' lines');
+  } else {
+    console.log('WARNING: minified but no mapping.txt -- crash reports will be unreadable');
+  }
+} else {
+  console.log('built without R8 (--no-minify)');
+}
