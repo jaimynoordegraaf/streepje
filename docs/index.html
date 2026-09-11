@@ -3,132 +3,45 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hulp bij streepje</title>
+<title>Verplaatst — streepje</title>
+
+<!--
+  Deze pagina staat nu op scoutingjwf.nl.
+
+  GitHub Pages kan geen echte 301 sturen, dus dit is de statische variant:
+  canonical vertelt zoekmachines welke URL de echte is, de meta refresh doet
+  de verwijzing zonder JavaScript, en location.replace() vervangt deze pagina
+  in de geschiedenis zodat de terugknop niet in een lus komt.
+-->
+<link rel="canonical" href="https://scoutingjwf.nl/streepje/">
+<meta http-equiv="refresh" content="0; url=https://scoutingjwf.nl/streepje/">
+<meta name="robots" content="noindex, follow">
+<script>location.replace("https://scoutingjwf.nl/streepje/");</script>
+
 <style>
-  :root {
-    --ink: #161616;
-    --dim: #5C5C60;
-    --line: #E3E3E6;
-    --paper: #F5F5F6;
-    --card: #FFFFFF;
-    --accent: #F15A24;
-    --link: #1F6FA8;
-  }
-  * { box-sizing: border-box; }
+  :root { --ink:#161616; --dim:#5a5a60; --paper:#f5f5f6; --card:#fff; --orange:#f15a24; --link:#1f6fa8; }
+  * { box-sizing:border-box; }
   body {
-    margin: 0;
-    padding: 32px 20px 80px;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: Montserrat, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-size: 16px;
-    line-height: 1.65;
+    margin:0; padding:48px 20px; background:var(--paper); color:var(--ink);
+    font-family:Montserrat,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:16px; line-height:1.65;
   }
-  main { max-width: 680px; margin: 0 auto; }
-  h1 {
-    font-size: 34px;
-    line-height: 1.15;
-    margin: 0 0 4px;
-    letter-spacing: -0.5px;
-  }
-  h1 em { color: var(--accent); font-style: italic; }
-  .updated { color: var(--dim); font-size: 14px; margin: 0 0 32px; }
-  h2 {
-    font-size: 20px;
-    margin: 36px 0 8px;
-    padding-top: 20px;
-    border-top: 1px solid var(--line);
-  }
-  h3 { font-size: 17px; margin: 22px 0 6px; }
-  p, li { margin: 0 0 12px; }
-  ul { padding-left: 20px; }
-  a { color: var(--link); }
-  .lead {
-    background: var(--card);
-    border-left: 4px solid var(--accent);
-    padding: 16px 18px;
-    border-radius: 4px;
-    margin-bottom: 8px;
-  }
-  .lead p:last-child { margin-bottom: 0; }
-  footer { margin-top: 44px; color: var(--dim); font-size: 14px; }
+  main { max-width:520px; margin:0 auto; background:var(--card);
+         border-left:4px solid var(--orange); border-radius:4px; padding:22px 24px; }
+  h1 { font-size:24px; line-height:1.2; margin:0 0 10px; }
+  h1 em { font-style:italic; color:var(--orange); }
+  p { margin:0 0 12px; }
+  p:last-child { margin-bottom:0; }
+  a { color:var(--link); }
+  .dim { color:var(--dim); font-size:14px; }
 </style>
 </head>
 <body>
 <main>
-
-<h1>Hulp bij <em>streepje</em></h1>
-<p class="updated">Voor Scouting Jan Willem Friso</p>
-
-<div class="lead">
-  <p><strong>streepje</strong> houdt bij wie op een evenement wat gedronken en gegeten
-  heeft, en wie er aan het eind nog moet betalen. Eén tik per bestelling, ook als er
-  geen bereik is.</p>
-  <p>Nog nooit mee gewerkt? Begin bij <a href="uitleg.html">Achter de bar met streepje</a>
-  — zes stappen met schermen erbij, van evenement klaarzetten tot afrekenen.</p>
-  <p>Kom je er niet uit? Mail
-  <a href="mailto:meco@scoutingjwf.nl">meco@scoutingjwf.nl</a>. Schrijf erbij welke
-  telefoon je gebruikt en wat er op het scherm stond, dan is het meestal zo gevonden.</p>
-</div>
-
-<h2>Veelgestelde vragen</h2>
-
-<h3>Ik ben de correctiecode kwijt</h3>
-
-<p>Die code staat alleen op de telefoon waarop hij is ingesteld en is nergens anders na
-te kijken — ook niet door ons. Zonder de code kun je niets meer weghalen in dat
-evenement. Wat er geturfd is blijft gewoon staan en je kunt het evenement nog steeds
-exporteren; maak daarna een nieuw evenement aan met een code die je onthoudt.</p>
-
-<h3>De andere telefoon kan de code niet scannen</h3>
-
-<p>Onderaan het scherm <em>Delen</em> staat ook een code van zes tekens. Die kun je op de
-andere telefoon intypen bij <em>Deelnemen</em>. Werkt dat ook niet, controleer dan of beide
-telefoons internet hebben; delen heeft verbinding nodig, turven niet.</p>
-
-<h3>Er staat "Offline" terwijl ik wel internet heb</h3>
-
-<p>Turf gewoon door. Alles wordt op de telefoon bewaard en gaat er vanzelf uit zodra er
-weer verbinding is. Op het scherm <em>Delen</em> zie je hoeveel bestellingen er nog
-klaarstaan.</p>
-
-<h3>Ik heb per ongeluk te veel geturfd</h3>
-
-<p>Een turf weghalen kan alleen op de telefoon die het evenement deelt, en alleen met de
-correctiecode. Dat is met opzet: een turf weghalen haalt geld van iemands rekening af.
-Elke correctie blijft zichtbaar bij de persoon, bij de totalen en in de export.</p>
-
-<h3>Hoe krijg ik de lijst naar de penningmeester?</h3>
-
-<p>Bij <em>Totalen</em> staat <em>Exporteren</em>. Kies CSV voor een bestand dat in Excel
-opengaat, of de korte samenvatting om in de groepsapp te plakken.</p>
-
-<h3>Hoe verwijder ik de gegevens weer?</h3>
-
-<p>Op de telefoon die deelt: <em>Delen</em> → <em>Gedeelde lijst verwijderen</em>, met de
-correctiecode. Namen en turfjes worden dan van de server gewist, ook voor de andere
-telefoons. Elke telefoon houdt zijn eigen kopie, dus je raakt niets kwijt van wat er al
-geturfd is. Wil je die kopie ook weg, verwijder dan het evenement op de telefoon zelf.</p>
-
-<h3>Werkt de app zonder account?</h3>
-
-<p>Ja. Er is geen account en er valt niets in te loggen. Zonder delen verlaat er geen
-enkel gegeven de telefoon.</p>
-
-<h2>Privacy</h2>
-
-<p>Wat er precies wordt opgeslagen, waar dat staat en hoe lang, staat in de
-<a href="privacy.html">privacyverklaring</a>.</p>
-
-<h2>Contact</h2>
-
-<p>Scouting Jan Willem Friso<br>
-<a href="mailto:meco@scoutingjwf.nl">meco@scoutingjwf.nl</a></p>
-
-<footer>
-  streepje is gemaakt voor Scouting Jan Willem Friso.
-</footer>
-
+  <h1><em>streepje</em> is verhuisd</h1>
+  <p>Hulp bij streepje staat nu op de website van Scouting Jan Willem Friso.</p>
+  <p><a href="https://scoutingjwf.nl/streepje/">https://scoutingjwf.nl/streepje/</a></p>
+  <p class="dim">Je wordt automatisch doorgestuurd. Gebeurt dat niet, klik dan op de link hierboven.</p>
 </main>
 </body>
 </html>
