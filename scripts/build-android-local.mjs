@@ -146,7 +146,25 @@ const appDir = path.join(androidDir, 'app');
 const sdkDir = androidHome.split(BACKSLASH).join(BACKSLASH + BACKSLASH);
 fs.writeFileSync(path.join(androidDir, 'local.properties'), 'sdk.dir=' + sdkDir + '\n');
 
-// 3. Put the key where Gradle expects it and hand it the passwords.
+// 3. Give Gradle more memory than the template's 2 GB heap and 512 MB Metaspace.
+//    Adding expo-updates pushed a release build past that Metaspace limit: the
+//    daemon hung for good in "OutOfMemoryError: Metaspace", still burning CPU
+//    but never writing another file, and never failed on its own.
+const gradlePropertiesPath = path.join(androidDir, 'gradle.properties');
+const gradleProperties = fs.readFileSync(gradlePropertiesPath, 'utf8');
+const jvmArgs = /^org\.gradle\.jvmargs=.*$/m;
+if (!jvmArgs.test(gradleProperties)) {
+  fail(
+    'Could not find org.gradle.jvmargs in android/gradle.properties.\n' +
+      'The Expo template changed shape. Read the file and update this script.'
+  );
+}
+fs.writeFileSync(
+  gradlePropertiesPath,
+  gradleProperties.replace(jvmArgs, 'org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m')
+);
+
+// 4. Put the key where Gradle expects it and hand it the passwords.
 fs.copyFileSync(keystore, path.join(appDir, 'upload.jks'));
 fs.appendFileSync(
   path.join(androidDir, 'gradle.properties'),
@@ -166,7 +184,7 @@ fs.appendFileSync(
   ].join('\n')
 );
 
-// 4. The generated build.gradle signs release with the *debug* key, which Play
+// 5. The generated build.gradle signs release with the *debug* key, which Play
 //    rejects. Give it a real release config instead.
 const buildGradlePath = path.join(appDir, 'build.gradle');
 let buildGradle = fs.readFileSync(buildGradlePath, 'utf8');
@@ -212,7 +230,7 @@ buildGradle = replaceOnce(
 
 fs.writeFileSync(buildGradlePath, buildGradle);
 
-// 5. Build. --console=plain because the animated progress bar redraws every
+// 6. Build. --console=plain because the animated progress bar redraws every
 //    second and a Windows terminal keeps every frame, burying the few lines
 //    that matter under thousands of "92% EXECUTING". The Kotlin deprecation
 //    warnings that remain come from Expo's own sources compiling against
