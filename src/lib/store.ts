@@ -336,6 +336,7 @@ export const useStore = create<StoreState>()(
       addOrder: (eventId, personId, itemId, delta) =>
         set({
           events: mapEvent(get().events, eventId, (event) => {
+            const item = event.menu.find((candidate) => candidate.id === itemId);
             const entry: OrderEntry = {
               id: newId(),
               personId,
@@ -343,6 +344,9 @@ export const useStore = create<StoreState>()(
               delta,
               deviceId: get().deviceId,
               deviceName: get().deviceName,
+              // Frozen at the tap. Changing the menu later must not reach back
+              // into turfs that were already made.
+              priceCents: item ? item.priceCents : null,
               createdAt: Date.now(),
             };
             return {
@@ -441,7 +445,7 @@ export const useStore = create<StoreState>()(
     {
       name: 'turf-store-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 7,
+      version: 8,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -465,6 +469,8 @@ export const useStore = create<StoreState>()(
                     delta: count,
                     deviceId: state.deviceId,
                     deviceName: null,
+                    // Filled from the menu by the version 8 step below.
+                    priceCents: null,
                     createdAt: event.createdAt ?? Date.now(),
                   });
                 }
@@ -554,6 +560,25 @@ export const useStore = create<StoreState>()(
               removedBy: person.removedBy ?? null,
             })),
           }));
+        }
+
+        if (fromVersion < 8) {
+          // Turfs start carrying their own price. Existing ones take the menu
+          // price as it stands, which is the price they were already counted
+          // at, so no total moves -- they simply stop following the menu. The
+          // database backfills its copy the same way.
+          state.events = (state.events ?? []).map((event: AppEvent) => {
+            const price = new Map(
+              (event.menu ?? []).map((item: MenuItem) => [item.id, item.priceCents])
+            );
+            return {
+              ...event,
+              entries: (event.entries ?? []).map((entry: OrderEntry) => ({
+                ...entry,
+                priceCents: entry.priceCents ?? price.get(entry.itemId) ?? null,
+              })),
+            };
+          });
         }
 
         return state;

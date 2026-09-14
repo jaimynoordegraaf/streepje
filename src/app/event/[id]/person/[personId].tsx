@@ -14,7 +14,7 @@ import {
   unlockCorrections,
 } from '@/lib/pin';
 import { useEvent, useStore } from '@/lib/store';
-import { activeMenu, personItemCount, personTotalCents, quantities } from '@/lib/totals';
+import { activeMenu, itemCents, personItemCount, personTotalCents, quantities } from '@/lib/totals';
 import type { MenuItem } from '@/lib/types';
 import { space, useTheme } from '@/theme';
 
@@ -48,6 +48,8 @@ export default function PersonScreen() {
 
   // Counted once here rather than per menu row, so the whole screen is one pass.
   const counts = quantities(event, person.id);
+  // What each item has cost so far, at the prices it was actually turfed at.
+  const spent = itemCents(event, person.id);
   const offered = activeMenu(event);
   const drinks = offered.filter((item) => item.category === 'drink');
   const food = offered.filter((item) => item.category === 'food');
@@ -100,7 +102,7 @@ export default function PersonScreen() {
             <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>{item.name}</Text>
             <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 2 }}>
               {formatCents(item.priceCents)}
-              {quantity > 0 ? ` · ${formatCents(quantity * item.priceCents)}` : ''}
+              {quantity > 0 ? ` · ${formatCents(spent[item.id] ?? 0)}` : ''}
             </Text>
           </View>
 

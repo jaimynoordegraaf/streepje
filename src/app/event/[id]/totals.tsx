@@ -169,11 +169,12 @@ export default function TotalsScreen() {
               ) : (
                 lines.map((line) => (
                   <View
-                    key={line.item.id}
+                    // An item can appear twice when its price changed partway.
+                    key={`${line.item.id}-${line.unitCents}`}
                     style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={{ color: theme.textDim, fontSize: 14 }}>
                       {line.quantity}× {line.item.name}
-                      <Text style={{ fontSize: 12 }}> @ {formatCents(line.item.priceCents)}</Text>
+                      <Text style={{ fontSize: 12 }}> @ {formatCents(line.unitCents)}</Text>
                     </Text>
                     <Text style={{ color: theme.textDim, fontSize: 14 }}>
                       {formatCents(line.lineCents)}

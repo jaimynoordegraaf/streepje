@@ -82,6 +82,17 @@ export type OrderEntry = {
    * that has never shared.
    */
   deviceName: string | null;
+  /**
+   * The item's price at the moment of the tap, copied in for the same reason
+   * as the device name: the menu can change later, and a turf already made
+   * must keep costing what it cost. Without this a season tab would reprice
+   * months of drinks the day beer goes up.
+   *
+   * On a correction this is recorded too, but not used: a correction takes off
+   * an existing turf, and that turf keeps its own price. Null only for entries
+   * from before prices were recorded, which count at the menu price.
+   */
+  priceCents: number | null;
   createdAt: number;
 };
 

@@ -52,6 +52,9 @@ create table if not exists public.order_entries (
   delta       integer not null,
   device_id   text not null,
   device_name text,
+  -- The price at the moment of the tap, so a menu change never reprices turfs
+  -- already made. Filled in by fill_entry_price below when a client sends none.
+  price_cents integer,
   created_at  timestamptz not null default now()
 );
 
@@ -128,6 +131,28 @@ begin
   delete from public.sessions where id = p_session_id;
 end;
 $$;
+
+-- A turf arriving without a price, from an app version older than prices
+-- being recorded, gets the current menu price. A price the phone did send is
+-- kept: it is the price at the tap, which is what the turf should cost.
+create or replace function public.fill_entry_price()
+returns trigger language plpgsql security definer
+set search_path = public as $$
+begin
+  if new.price_cents is null then
+    select i.price_cents into new.price_cents
+      from public.session_items i
+     where i.id = new.item_id
+       and i.session_id = new.session_id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists order_entries_fill_price on public.order_entries;
+create trigger order_entries_fill_price
+  before insert on public.order_entries
+  for each row execute function public.fill_entry_price();
 
 -- ------------------------------------------------------------- policies ----
 

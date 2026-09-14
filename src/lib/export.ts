@@ -88,7 +88,7 @@ export function buildCsv(event: AppEvent, local?: LocalDevice): string {
           line.item.name,
           line.item.category === 'drink' ? 'drankje' : 'eten',
           line.quantity,
-          centsToPlainNumber(line.item.priceCents),
+          centsToPlainNumber(line.unitCents),
           centsToPlainNumber(line.lineCents),
         ])
       );
@@ -171,9 +171,7 @@ export function buildSummaryText(event: AppEvent): string {
 
   for (const person of activePeople(event)) {
     const total = personTotalCents(event, person.id);
-    const detail = personLines(event, person.id)
-      .map((line) => `${line.quantity}x ${line.item.name}`)
-      .join(', ');
+    const detail = consumedText(event, person.id);
     const outstanding = personOutstandingCents(event, person);
     const status = isSettled(event, person)
       ? ' (betaald)'
@@ -197,6 +195,22 @@ export function buildSummaryText(event: AppEvent): string {
 }
 
 /**
+ * "3x Bier, 1x Friet", for a message.
+ *
+ * One entry per item even when its price changed partway: someone reading what
+ * they had does not need the price history. The CSV carries that detail.
+ */
+function consumedText(event: AppEvent, personId: string): string {
+  const byItem = new Map<string, { name: string; quantity: number }>();
+  for (const line of personLines(event, personId)) {
+    const seen = byItem.get(line.item.id);
+    if (seen) seen.quantity += line.quantity;
+    else byItem.set(line.item.id, { name: line.item.name, quantity: line.quantity });
+  }
+  return [...byItem.values()].map((item) => `${item.quantity}x ${item.name}`).join(', ');
+}
+
+/**
  * A short message for one person, to send them by WhatsApp or alongside a
  * payment request.
  *
@@ -215,9 +229,7 @@ export function buildPersonRequest(event: AppEvent, person: Person): string {
 
   lines.push(`Je hebt nog ${formatCents(outstanding)} open van ${event.name}.`);
 
-  const detail = personLines(event, person.id)
-    .map((line) => `${line.quantity}x ${line.item.name}`)
-    .join(', ');
+  const detail = consumedText(event, person.id);
   if (detail) lines.push(detail);
 
   if (person.paidCents > 0) {

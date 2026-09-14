@@ -11,6 +11,8 @@ import type { AppEvent, MenuItem, OrderEntry, Person } from './types';
 export type Line = {
   item: MenuItem;
   quantity: number;
+  /** What one of these cost when it was turfed. */
+  unitCents: number;
   lineCents: number;
 };
 
@@ -44,23 +46,94 @@ export function quantityFor(event: AppEvent, personId: string, itemId: string): 
   return Math.max(0, total);
 }
 
-/** Every item one person consumed, with the money each line adds up to. */
+/**
+ * The price of every turf one person still has, oldest first: itemId -> prices.
+ *
+ * Each turf keeps the price it was charged at, so a menu change only affects
+ * what is turfed afterwards.
+ *
+ * How many remain is the plain sum of the deltas, exactly as before, so the
+ * count never depends on the order entries arrived in. Which ones remain is
+ * the oldest: a correction takes off the most recent turf, the one a slip of
+ * the finger just added. That matters once prices differ -- a correction
+ * priced at today's price would not cancel a turf made at last month's, and
+ * would leave a few cents behind on someone's tab.
+ *
+ * Ties on time fall back to the entry id, so every phone keeps the same turfs
+ * and arrives at the same total.
+ */
+function remainingPrices(event: AppEvent, personId: string): Map<string, number[]> {
+  const menuPrice = new Map(event.menu.map((item) => [item.id, item.priceCents]));
+  const net = new Map<string, number>();
+  const turfs = new Map<string, { at: number; id: string; price: number }[]>();
+
+  for (const entry of event.entries) {
+    if (entry.personId !== personId) continue;
+    net.set(entry.itemId, (net.get(entry.itemId) ?? 0) + entry.delta);
+    if (entry.delta <= 0) continue;
+
+    // Entries from before prices were recorded count at the menu price, which
+    // is what they were always counted at.
+    const price = entry.priceCents ?? menuPrice.get(entry.itemId) ?? 0;
+    const list = turfs.get(entry.itemId) ?? [];
+    for (let i = 0; i < entry.delta; i++) list.push({ at: entry.createdAt, id: entry.id, price });
+    turfs.set(entry.itemId, list);
+  }
+
+  const result = new Map<string, number[]>();
+  for (const [itemId, list] of turfs) {
+    // Clamped at zero, as the counts always were.
+    const keep = Math.max(0, net.get(itemId) ?? 0);
+    if (keep === 0) continue;
+    list.sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    result.set(itemId, list.slice(0, keep).map((turf) => turf.price));
+  }
+  return result;
+}
+
+/**
+ * Every item one person consumed, with the money each line adds up to.
+ *
+ * One line per item per price. Three beers at 2.50 and one at 2.75 are two
+ * lines, because a single line with one unit price would be wrong for one of
+ * them, and an invoice has to show what was actually charged.
+ */
 export function personLines(event: AppEvent, personId: string): Line[] {
-  const counts = quantities(event, personId);
-  return event.menu
-    .filter((item) => (counts[item.id] ?? 0) > 0)
-    .map((item) => {
-      const quantity = counts[item.id];
-      return { item, quantity, lineCents: quantity * item.priceCents };
-    });
+  const remaining = remainingPrices(event, personId);
+  const lines: Line[] = [];
+  for (const item of event.menu) {
+    const prices = remaining.get(item.id);
+    if (!prices) continue;
+    const byPrice = new Map<number, number>();
+    for (const price of prices) byPrice.set(price, (byPrice.get(price) ?? 0) + 1);
+    for (const [unitCents, quantity] of byPrice) {
+      lines.push({ item, quantity, unitCents, lineCents: quantity * unitCents });
+    }
+  }
+  return lines;
 }
 
 export function personTotalCents(event: AppEvent, personId: string): number {
-  const counts = quantities(event, personId);
-  return event.menu.reduce(
-    (sum, item) => sum + Math.max(0, counts[item.id] ?? 0) * item.priceCents,
-    0
-  );
+  const remaining = remainingPrices(event, personId);
+  let total = 0;
+  for (const item of event.menu) {
+    for (const price of remaining.get(item.id) ?? []) total += price;
+  }
+  return total;
+}
+
+/**
+ * What each item has cost one person so far: itemId -> cents.
+ *
+ * For a running amount beside an item, where splitting by price would be
+ * clutter. The lines above are the place for that detail.
+ */
+export function itemCents(event: AppEvent, personId: string): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const [itemId, prices] of remainingPrices(event, personId)) {
+    result[itemId] = prices.reduce((sum, price) => sum + price, 0);
+  }
+  return result;
 }
 
 /** How many things one person has had in total, regardless of price. */

@@ -46,6 +46,8 @@ type EntryRow = {
   delta: number;
   device_id: string;
   device_name: string | null;
+  /** Null from app versions older than the price being recorded. */
+  price_cents: number | null;
   created_at: string;
 };
 
@@ -95,6 +97,7 @@ const toEntry = (row: EntryRow): OrderEntry => ({
   delta: row.delta,
   deviceId: row.device_id,
   deviceName: row.device_name,
+  priceCents: row.price_cents ?? null,
   createdAt: Date.parse(row.created_at),
 });
 
@@ -106,6 +109,7 @@ const fromEntry = (sessionId: string, entry: OrderEntry): EntryRow => ({
   delta: entry.delta,
   device_id: entry.deviceId,
   device_name: entry.deviceName,
+  price_cents: entry.priceCents,
   created_at: new Date(entry.createdAt).toISOString(),
 });
 
