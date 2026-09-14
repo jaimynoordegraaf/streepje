@@ -1,34 +1,42 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, PixelRatio, Pressable, View, useWindowDimensions } from 'react-native';
 
 import { Text } from '@/components/text';
 
 import { CartIcon } from '@/components/icons';
-import { PromptModal } from '@/components/modals';
+import { GuestModal, MemberPickerModal, PromptModal } from '@/components/modals';
 import { BottomBar, Button, Card, EmptyState, HeaderButton, Screen } from '@/components/ui';
 import { formatCents } from '@/lib/money';
 import { useEvent, useStore } from '@/lib/store';
 import { useEventSync, type SyncStatus } from '@/lib/use-sync';
 import {
   activePeople,
+  eventInvoiceCents,
   eventOutstandingCents,
   eventPaidCents,
   eventTotalCents,
   isSettled,
+  paysTonight,
   personItemCount,
   personTotalCents,
 } from '@/lib/totals';
+import type { ListKind } from '@/lib/types';
 import { radius, space, useTheme } from '@/theme';
 
 function SummaryCard({
+  kind,
   total,
   received,
   outstanding,
+  invoiced,
 }: {
+  kind: ListKind;
   total: number;
   received: number;
   outstanding: number;
+  /** What goes onto the treasurer's invoice instead of being paid tonight. */
+  invoiced: number;
 }) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
@@ -56,8 +64,21 @@ function SummaryCard({
       </View>
     );
 
+  // Nothing on a tab is paid at the bar, so "received" and "outstanding" would
+  // only ever read zero and look as if something were wrong.
+  if (kind === 'tab') {
+    return (
+      <Card style={{ gap: space.xs }}>
+        {cell('Totaal', total, theme.text)}
+        <Text style={{ color: theme.textDim, fontSize: 13 }}>
+          Alles op deze rekening gaat op de factuur van de penningmeester.
+        </Text>
+      </Card>
+    );
+  }
+
   return (
-    <Card>
+    <Card style={{ gap: space.sm }}>
       <View
         style={
           stacked
@@ -68,6 +89,11 @@ function SummaryCard({
         {cell('Ontvangen', received, theme.good)}
         {cell('Openstaand', outstanding, outstanding > 0 ? theme.danger : theme.textDim)}
       </View>
+      {invoiced > 0 ? (
+        <Text style={{ color: theme.textDim, fontSize: 13 }}>
+          Waarvan {formatCents(invoiced)} op factuur
+        </Text>
+      ) : null}
     </Card>
   );
 }
@@ -125,15 +151,40 @@ function ShareStrip({
   );
 }
 
+function Badge({ label, color }: { label: string; color: string }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        paddingHorizontal: space.sm,
+        paddingVertical: 3,
+        borderRadius: radius.pill,
+        backgroundColor: theme.chip,
+      }}>
+      <Text style={{ color, fontSize: 12, fontWeight: '700' }}>{label}</Text>
+    </View>
+  );
+}
+
 export default function EventScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const event = useEvent(id);
+  const events = useStore((state) => state.events);
   const addPerson = useStore((state) => state.addPerson);
+  const addMembers = useStore((state) => state.addMembers);
   const addUnknownPerson = useStore((state) => state.addUnknownPerson);
-  const [prompting, setPrompting] = useState(false);
+  const [adding, setAdding] = useState<'name' | 'guest' | 'members' | null>(null);
   const { status, pending, detailsPending } = useEventSync(event);
+
+  // The tabs on this phone, to pick members from. The whole list is selected
+  // and filtered here, because a selector that returned a fresh array every
+  // time would make the store think something changed on every render.
+  const tabs = useMemo(
+    () => events.filter((candidate) => candidate.kind === 'tab' && candidate.id !== id),
+    [events, id]
+  );
 
   if (!event) {
     return (
@@ -143,6 +194,21 @@ export default function EventScreen() {
       </Screen>
     );
   }
+
+  const tab = event.kind === 'tab';
+  const people = activePeople(event);
+  const nameOf = (personId: string | null) =>
+    personId ? (event.people.find((person) => person.id === personId)?.name ?? null) : null;
+
+  // For a sale to someone not on the list: record it now, and work out who it
+  // was later by renaming them.
+  const addUnknown = () => {
+    const personId = addUnknownPerson(id);
+    router.push({
+      pathname: '/event/[id]/person/[personId]',
+      params: { id, personId },
+    });
+  };
 
   return (
     <Screen
@@ -175,15 +241,17 @@ export default function EventScreen() {
       />
 
       <FlatList
-        data={activePeople(event)}
+        data={people}
         keyExtractor={(person) => person.id}
         contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: space.xxl }}
         ListHeaderComponent={
           <View style={{ gap: space.md, marginBottom: space.xs }}>
             <SummaryCard
+              kind={event.kind}
               total={eventTotalCents(event)}
               received={eventPaidCents(event)}
               outstanding={eventOutstandingCents(event)}
+              invoiced={eventInvoiceCents(event)}
             />
             <ShareStrip
               status={status}
@@ -195,38 +263,52 @@ export default function EventScreen() {
           </View>
         }
         ListFooterComponent={
-          <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
-            <Button
-              title="Persoon toevoegen"
-              variant="secondary"
-              onPress={() => setPrompting(true)}
-              style={{ flex: 1 }}
-            />
-            <Button
-              title="Onbekend"
-              variant="secondary"
-              onPress={() => {
-                // For a sale to someone not on the list: record it now, work
-                // out who it was later by renaming them.
-                const personId = addUnknownPerson(id);
-                router.push({
-                  pathname: '/event/[id]/person/[personId]',
-                  params: { id, personId },
-                });
-              }}
-              style={{ flex: 1 }}
-            />
-          </View>
+          tab ? (
+            <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
+              <Button
+                title="Lid toevoegen"
+                variant="secondary"
+                onPress={() => setAdding('name')}
+                style={{ flex: 1 }}
+              />
+              <Button title="Onbekend" variant="secondary" onPress={addUnknown} style={{ flex: 1 }} />
+            </View>
+          ) : (
+            <View style={{ gap: space.sm, marginTop: space.sm }}>
+              <View style={{ flexDirection: 'row', gap: space.sm }}>
+                <Button
+                  title="Leden"
+                  variant="secondary"
+                  onPress={() => setAdding('members')}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  title="Gast"
+                  variant="secondary"
+                  onPress={() => setAdding('guest')}
+                  style={{ flex: 1 }}
+                />
+              </View>
+              <Button title="Onbekend" variant="secondary" onPress={addUnknown} />
+            </View>
+          )
         }
         ListEmptyComponent={
           <EmptyState
-            title="Nog niemand toegevoegd"
-            hint="Voeg de mensen toe die meedoen en tik daarna op een naam om hun drankjes en eten te turven."
+            title={tab ? 'Nog geen leden' : 'Nog niemand toegevoegd'}
+            hint={
+              tab
+                ? 'Voeg de leden van de groep toe en tik daarna op een naam om te turven. Alles gaat op de factuur.'
+                : 'Kies leden uit de lopende rekening of voeg een gast toe, en tik daarna op een naam om te turven.'
+            }
           />
         }
         renderItem={({ item: person }) => {
           const total = personTotalCents(event, person.id);
           const count = personItemCount(event, person.id);
+          const host = nameOf(person.guestOf);
+          // On a tab everyone is invoiced, so saying so on every row is noise.
+          const invoiced = !tab && !paysTonight(event, person);
           return (
             <Pressable
               onPress={() =>
@@ -244,21 +326,14 @@ export default function EventScreen() {
                     </Text>
                     <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 2 }}>
                       {count} {count === 1 ? 'consumptie' : 'consumpties'}
+                      {host ? ' · gast van ' + host : ''}
                     </Text>
                   </View>
 
-                  {isSettled(event, person) ? (
-                    <View
-                      style={{
-                        paddingHorizontal: space.sm,
-                        paddingVertical: 3,
-                        borderRadius: radius.pill,
-                        backgroundColor: theme.chip,
-                      }}>
-                      <Text style={{ color: theme.good, fontSize: 12, fontWeight: '700' }}>
-                        BETAALD
-                      </Text>
-                    </View>
+                  {invoiced ? (
+                    <Badge label="OP FACTUUR" color={theme.link} />
+                  ) : isSettled(event, person) ? (
+                    <Badge label="BETAALD" color={theme.good} />
                   ) : null}
 
                   <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>
@@ -272,14 +347,35 @@ export default function EventScreen() {
       />
 
       <PromptModal
-        visible={prompting}
-        title="Persoon toevoegen"
+        visible={adding === 'name'}
+        title="Lid toevoegen"
         placeholder="Naam"
         submitLabel="Toevoegen"
-        onCancel={() => setPrompting(false)}
+        onCancel={() => setAdding(null)}
         onSubmit={(name) => {
           addPerson(id, name);
-          setPrompting(false);
+          setAdding(null);
+        }}
+      />
+
+      <GuestModal
+        visible={adding === 'guest'}
+        hosts={people.filter((person) => person.memberId !== null)}
+        onCancel={() => setAdding(null)}
+        onSubmit={(guest) => {
+          addPerson(id, guest.name, { billing: guest.billing, guestOf: guest.guestOf });
+          setAdding(null);
+        }}
+      />
+
+      <MemberPickerModal
+        visible={adding === 'members'}
+        tabs={tabs}
+        alreadyIn={event.people.flatMap((person) => (person.memberId ? [person.memberId] : []))}
+        onCancel={() => setAdding(null)}
+        onSubmit={(members) => {
+          addMembers(id, members);
+          setAdding(null);
         }}
       />
     </Screen>

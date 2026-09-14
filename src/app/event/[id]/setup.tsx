@@ -5,7 +5,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { MenuEditor } from '@/components/menu-editor';
-import { PromptModal } from '@/components/modals';
+import { PromptModal, whenAlertClosed } from '@/components/modals';
 import { PinModal } from '@/components/pin-modal';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import {
@@ -36,6 +36,7 @@ export default function SetupScreen() {
   const renamePerson = useStore((state) => state.renamePerson);
   const removePerson = useStore((state) => state.removePerson);
   const restorePerson = useStore((state) => state.restorePerson);
+  const setPersonBilling = useStore((state) => state.setPersonBilling);
   const deviceName = useStore((state) => state.deviceName);
   const addItem = useStore((state) => state.addItem);
   const updateItem = useStore((state) => state.updateItem);
@@ -94,8 +95,31 @@ export default function SetupScreen() {
               return;
             }
             setRemoving(person);
-            setRemoveAsk(!block.allowed && block.reason === 'no-pin' ? 'set' : 'verify');
+            whenAlertClosed(() =>
+              setRemoveAsk(!block.allowed && block.reason === 'no-pin' ? 'set' : 'verify')
+            );
           },
+        },
+      ]
+    );
+  };
+
+  /**
+   * Moving someone between the invoice and paying tonight decides who gets
+   * asked for the money, so it is an admin's call, confirmed once first.
+   */
+  const confirmBillingChange = (person: Person) => {
+    const toInvoice = person.billing !== 'invoice';
+    Alert.alert(
+      toInvoice ? person.name + ' op de factuur zetten?' : person.name + ' vanavond laten betalen?',
+      toInvoice
+        ? 'Wat ' + person.name + ' turft gaat dan naar de penningmeester. Doe dit alleen als diens gegevens bekend zijn.'
+        : 'Wat ' + person.name + ' turft moet dan aan het eind van de avond betaald worden.',
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        {
+          text: toInvoice ? 'Op factuur' : 'Vanavond',
+          onPress: () => setPersonBilling(id, person.id, toInvoice ? 'invoice' : 'tonight'),
         },
       ]
     );
@@ -133,7 +157,7 @@ export default function SetupScreen() {
               doDeleteEvent();
               return;
             }
-            setDeleteAsk(event.correctionPin ? 'verify' : 'set');
+            whenAlertClosed(() => setDeleteAsk(event.correctionPin ? 'verify' : 'set'));
           },
         },
       ]
@@ -164,16 +188,34 @@ export default function SetupScreen() {
         </View>
 
         <View style={{ gap: space.sm }}>
-          <SectionTitle>Personen</SectionTitle>
+          <SectionTitle>{event.kind === 'tab' ? 'Leden' : 'Personen'}</SectionTitle>
           {activePeople(event).length === 0 ? (
             <EmptyState title="Nog niemand toegevoegd" />
           ) : (
             activePeople(event).map((person) => (
               <Card key={person.id} style={{ paddingVertical: space.md }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-                  <Text style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '600' }}>
-                    {person.name}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>
+                      {person.name}
+                    </Text>
+                    {event.kind === 'event' ? (
+                      <Pressable
+                        disabled={!isAdminDevice(event)}
+                        onPress={() => confirmBillingChange(person)}
+                        hitSlop={6}>
+                        <Text
+                          style={{
+                            color: isAdminDevice(event) ? theme.link : theme.textDim,
+                            fontSize: 12,
+                            marginTop: 2,
+                          }}>
+                          {person.billing === 'invoice' ? 'Op factuur' : 'Betaalt vanavond'}
+                          {person.memberId ? ' · lid' : ''}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
                   <Pressable onPress={() => setRenamingPerson(person)} hitSlop={8}>
                     <Text style={{ color: theme.link, fontWeight: '600' }}>Hernoemen</Text>
                   </Pressable>

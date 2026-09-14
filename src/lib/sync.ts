@@ -17,7 +17,15 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { isAdminDevice } from './pin';
 import { isSettled } from './totals';
 
-import type { AppEvent, Category, MenuItem, OrderEntry, Person, SessionMember } from './types';
+import type {
+  AppEvent,
+  Category,
+  ListKind,
+  MenuItem,
+  OrderEntry,
+  Person,
+  SessionMember,
+} from './types';
 import { ensureSignedIn, supabase } from './supabase';
 
 type PersonRow = {
@@ -30,6 +38,10 @@ type PersonRow = {
   paid_at: string | null;
   removed_at: string | null;
   removed_by: string | null;
+  member_id: string | null;
+  /** Rows from before billing existed have the database default, 'tonight'. */
+  billing: 'invoice' | 'tonight';
+  guest_of: string | null;
 };
 type ItemRow = {
   id: string;
@@ -61,6 +73,9 @@ const toPerson = (row: PersonRow): Person => ({
   paidAt: row.paid_at ? Date.parse(row.paid_at) : null,
   removedAt: row.removed_at ? Date.parse(row.removed_at) : null,
   removedBy: row.removed_by ?? null,
+  memberId: row.member_id ?? null,
+  billing: row.billing === 'invoice' ? 'invoice' : 'tonight',
+  guestOf: row.guest_of ?? null,
 });
 
 const fromPerson = (sessionId: string, person: Person, settled: boolean): PersonRow => ({
@@ -72,6 +87,9 @@ const fromPerson = (sessionId: string, person: Person, settled: boolean): Person
   paid_at: person.paidAt ? new Date(person.paidAt).toISOString() : null,
   removed_at: person.removedAt ? new Date(person.removedAt).toISOString() : null,
   removed_by: person.removedBy,
+  member_id: person.memberId,
+  billing: person.billing,
+  guest_of: person.guestOf,
 });
 
 const toItem = (row: ItemRow): MenuItem => ({
@@ -149,6 +167,7 @@ export async function hostSession(event: AppEvent, joinCode: string): Promise<st
     p_id: event.id,
     p_join_code: joinCode,
     p_name: event.name,
+    p_kind: event.kind,
   });
 
   if (error) {
@@ -229,6 +248,7 @@ export async function deleteSharedSession(sessionId: string): Promise<void> {
 
 export type RemoteSession = {
   name: string;
+  kind: ListKind;
   createdAt: number;
   closed: boolean;
   people: Person[];
@@ -241,7 +261,7 @@ export async function fetchSession(sessionId: string): Promise<RemoteSession> {
   const db = client();
 
   const [session, people, items, entries] = await Promise.all([
-    db.from('sessions').select('name, closed, created_at').eq('id', sessionId).maybeSingle(),
+    db.from('sessions').select('name, kind, closed, created_at').eq('id', sessionId).maybeSingle(),
     db.from('session_people').select('*').eq('session_id', sessionId),
     db.from('session_items').select('*').eq('session_id', sessionId),
     db.from('order_entries').select('*').eq('session_id', sessionId),
@@ -255,6 +275,7 @@ export async function fetchSession(sessionId: string): Promise<RemoteSession> {
 
   return {
     name: session.data.name,
+    kind: session.data.kind === 'tab' ? 'tab' : 'event',
     createdAt: Date.parse(session.data.created_at),
     closed: session.data.closed,
     people: (people.data ?? []).map(toPerson),

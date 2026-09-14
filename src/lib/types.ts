@@ -54,7 +54,39 @@ export type Person = {
   removedAt: number | null;
   /** Which phone removed them, by name, as it stood at the time. */
   removedBy: string | null;
+  /**
+   * For someone at an event: the id of the same person in the season tab.
+   *
+   * This is what lets a member's drinks at an event end up on the same
+   * quarterly invoice as their drinks on a normal bar night. Matching by name
+   * would turn "Jan" and "Jan de V." into two people -- exactly the mistake
+   * that ends up on an invoice. Null for guests, and for everyone on a tab,
+   * where the person is the member.
+   */
+  memberId: string | null;
+  /** Whether this person is invoiced or settles on the night. */
+  billing: Billing;
+  /** Who a guest came with: the id of a person in the same list. */
+  guestOf: string | null;
 };
+
+/**
+ * What a list is for.
+ *
+ * An event is one occasion, where guests may settle on the night. A tab runs
+ * across the season for the group's own members, who are invoiced by the
+ * treasurer each quarter, so nothing on a tab is ever paid at the bar.
+ */
+export type ListKind = 'event' | 'tab';
+
+/**
+ * How someone's consumption gets paid.
+ *
+ * `invoice`: onto the treasurer's quarterly invoice -- every member, and any
+ * guest who left their details. `tonight`: settled at the end of the evening,
+ * by Tikkie or a payment request.
+ */
+export type Billing = 'invoice' | 'tonight';
 
 /**
  * One logged order. These are only ever ADDED, never changed or removed.
@@ -131,6 +163,8 @@ export type ShareInfo = {
 export type AppEvent = {
   id: string;
   name: string;
+  /** An event, or the season tab. Fixed when the list is created. */
+  kind: ListKind;
   createdAt: number;
   people: Person[];
   /**

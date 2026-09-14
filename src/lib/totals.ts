@@ -163,23 +163,47 @@ export function eventTotalCents(event: AppEvent): number {
   return activePeople(event).reduce((sum, person) => sum + personTotalCents(event, person.id), 0);
 }
 
-/** What one person still owes. Never negative: overpaying is not a debt. */
-export function personOutstandingCents(event: AppEvent, person: Person): number {
-  return Math.max(0, personTotalCents(event, person.id) - person.paidCents);
-}
-
-/** Settled when nothing is left owing, which changes again if they order more. */
-export function isSettled(event: AppEvent, person: Person): boolean {
-  return personOutstandingCents(event, person) === 0;
-}
-
-/** Money actually collected. */
-export function eventPaidCents(event: AppEvent): number {
-  return activePeople(event).reduce((sum, person) => sum + person.paidCents, 0);
+/**
+ * Does this person pay at the end of the evening?
+ *
+ * Only a guest at an event does. Everyone on a tab, and every member at an
+ * event, is invoiced by the treasurer instead -- so for them there is nothing
+ * to collect tonight: no amount owing, no "paid" badge, no payment buttons.
+ * Checked against the list as well as the person, so a row an older app added
+ * to a tab with the default "tonight" is still treated as invoiced.
+ */
+export function paysTonight(event: AppEvent, person: Person): boolean {
+  return event.kind === 'event' && person.billing === 'tonight';
 }
 
 /**
- * Money still to come in.
+ * What one person still has to pay tonight. Never negative: overpaying is not
+ * a debt. Zero for anyone on the invoice, whose total is the treasurer's to
+ * collect, not the bar's.
+ */
+export function personOutstandingCents(event: AppEvent, person: Person): number {
+  if (!paysTonight(event, person)) return 0;
+  return Math.max(0, personTotalCents(event, person.id) - person.paidCents);
+}
+
+/**
+ * Settled when nothing is left owing tonight, which changes again if they
+ * order more. Never true for someone on the invoice: they have not paid, they
+ * simply do not pay here.
+ */
+export function isSettled(event: AppEvent, person: Person): boolean {
+  return paysTonight(event, person) && personOutstandingCents(event, person) === 0;
+}
+
+/** Money actually collected at the bar. */
+export function eventPaidCents(event: AppEvent): number {
+  return activePeople(event)
+    .filter((person) => paysTonight(event, person))
+    .reduce((sum, person) => sum + person.paidCents, 0);
+}
+
+/**
+ * Money still to come in tonight.
  *
  * Summed per person rather than taken from the grand total, so someone who
  * overpaid cannot quietly cancel out what somebody else still owes.
@@ -189,6 +213,13 @@ export function eventOutstandingCents(event: AppEvent): number {
     (sum, person) => sum + personOutstandingCents(event, person),
     0
   );
+}
+
+/** What goes onto the treasurer's invoice rather than being paid at the bar. */
+export function eventInvoiceCents(event: AppEvent): number {
+  return activePeople(event)
+    .filter((person) => !paysTonight(event, person))
+    .reduce((sum, person) => sum + personTotalCents(event, person.id), 0);
 }
 
 /**

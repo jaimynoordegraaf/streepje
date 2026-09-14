@@ -64,6 +64,7 @@ export default function JoinScreen() {
         menu: remote.menu,
         entries: remote.entries,
         unsyncedEntryIds: [],
+        kind: remote.kind,
         closed: remote.closed,
         share: { joinCode: code, role: 'member', lastSyncedAt: Date.now() },
         // A phone that joins starts as a member, with no PIN. If an admin makes

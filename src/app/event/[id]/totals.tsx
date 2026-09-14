@@ -20,7 +20,9 @@ import {
   corrections,
   deviceLabel,
   isSettled,
+  paysTonight,
   personOutstandingCents,
+  eventInvoiceCents,
   eventOutstandingCents,
   eventPaidCents,
   eventTotalCents,
@@ -49,9 +51,11 @@ export default function TotalsScreen() {
     );
   }
 
+  const tab = event.kind === 'tab';
   const total = eventTotalCents(event);
   const received = eventPaidCents(event);
   const outstanding = eventOutstandingCents(event);
+  const invoiced = eventInvoiceCents(event);
 
   /** Run an export and turn any failure into a readable message. */
   const runExport = async (action: () => Promise<void>) => {
@@ -85,7 +89,9 @@ export default function TotalsScreen() {
         data={activePeople(event)}
         keyExtractor={(person) => person.id}
         contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: space.xxl + bottomInset }}
-        ListEmptyComponent={<EmptyState title="Nog niemand in dit evenement" />}
+        ListEmptyComponent={
+          <EmptyState title={tab ? 'Nog geen leden op deze rekening' : 'Nog niemand in dit evenement'} />
+        }
         ListFooterComponent={
           activePeople(event).length > 0 || removedPeople(event).length > 0 ? (
             <>
@@ -117,16 +123,25 @@ export default function TotalsScreen() {
             ) : null}
 
             <Card style={{ gap: space.sm, marginTop: space.xs }}>
-              {totalRow('Ontvangen', received, theme.good)}
-              {totalRow('Openstaand', outstanding, outstanding > 0 ? theme.danger : theme.textDim)}
-              <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 2 }} />
+              {tab ? (
+                <Text style={{ color: theme.textDim, fontSize: 13 }}>
+                  Alles op deze rekening gaat op de factuur van de penningmeester.
+                </Text>
+              ) : (
+                <>
+                  {totalRow('Ontvangen', received, theme.good)}
+                  {totalRow('Openstaand', outstanding, outstanding > 0 ? theme.danger : theme.textDim)}
+                  {invoiced > 0 ? totalRow('Op factuur', invoiced, theme.link) : null}
+                  <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 2 }} />
+                </>
+              )}
               {totalRow('Eindtotaal', total, theme.text, true)}
 
               {correctionCount(event) > 0 ? (
                 <Text style={{ color: theme.danger, fontSize: 13, marginTop: space.xs }}>
                   {correctionCount(event)}{' '}
-                  {correctionCount(event) === 1 ? 'turfje is' : 'turfjes zijn'} weggehaald tijdens
-                  dit evenement.
+                  {correctionCount(event) === 1 ? 'turfje is' : 'turfjes zijn'} weggehaald
+                  {tab ? ' op deze rekening.' : ' tijdens dit evenement.'}
                 </Text>
               ) : null}
 
@@ -152,14 +167,32 @@ export default function TotalsScreen() {
           const personTotal = personTotalCents(event, person.id);
           const removed = corrections(event, person.id);
           const settled = isSettled(event, person);
-          const outstanding = personOutstandingCents(event, person);
+          const personOutstanding = personOutstandingCents(event, person);
+          const tonight = paysTonight(event, person);
+          const host = person.guestOf
+            ? event.people.find((candidate) => candidate.id === person.guestOf)?.name
+            : undefined;
+          const subtitle = [
+            host ? 'gast van ' + host : null,
+            // On a tab everyone is invoiced, so it goes without saying there.
+            !tab && !tonight ? 'op factuur' : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
 
           return (
             <Card style={{ gap: space.sm }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ flex: 1, color: theme.text, fontSize: 17, fontWeight: '700' }}>
-                  {person.name}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>
+                    {person.name}
+                  </Text>
+                  {subtitle ? (
+                    <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 2 }}>
+                      {subtitle}
+                    </Text>
+                  ) : null}
+                </View>
                 <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>
                   {formatCents(personTotal)}
                 </Text>
@@ -206,71 +239,77 @@ export default function TotalsScreen() {
                 </View>
               ) : null}
 
-              {person.paidCents > 0 && !settled ? (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ color: theme.good, fontSize: 13, fontWeight: '600' }}>
-                    {formatCents(person.paidCents)} betaald
-                  </Text>
-                  <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '600' }}>
-                    {formatCents(outstanding)} open
-                  </Text>
-                </View>
-              ) : null}
-
-              {/* Recording a payment changes what someone owes, so only an admin
-                  phone offers it. The database ignores it from anyone else. */}
-              {isAdminDevice(event) ? (
-                <Pressable
-                  onPress={() =>
-                    setPersonPayment(id, person.id, settled ? 0 : personTotal)
-                  }
-                  style={({ pressed }) => ({
-                    marginTop: space.xs,
-                    paddingVertical: 10,
-                    borderRadius: radius.md,
-                    alignItems: 'center',
-                    backgroundColor: settled ? theme.good : theme.chip,
-                    opacity: pressed ? 0.75 : 1,
-                  })}>
-                  <Text
-                    style={{
-                      color: settled ? theme.onGood : theme.text,
-                      fontWeight: '700',
-                      fontSize: 14,
-                    }}>
-                    {settled ? 'Betaald ✓  (tik om ongedaan te maken)' : 'Markeer als betaald'}
-                  </Text>
-                </Pressable>
-              ) : settled ? (
-                <Text
-                  style={{
-                    marginTop: space.xs,
-                    color: theme.good,
-                    fontWeight: '700',
-                    fontSize: 14,
-                    textAlign: 'center',
-                  }}>
-                  Betaald ✓
-                </Text>
-              ) : null}
-
-              {!settled ? (
-                <View style={{ flexDirection: 'row', gap: space.sm }}>
-                  {isAdminDevice(event) ? (
-                    <Button
-                      title="Deelbetaling"
-                      variant="secondary"
-                      onPress={() => setPayingPerson(person)}
-                      style={{ flex: 1 }}
-                    />
+              {/* Payment controls exist only for someone settling tonight. Anyone
+                  on the invoice is the treasurer's to collect from, not the bar's. */}
+              {tonight ? (
+                <>
+                  {person.paidCents > 0 && !settled ? (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ color: theme.good, fontSize: 13, fontWeight: '600' }}>
+                        {formatCents(person.paidCents)} betaald
+                      </Text>
+                      <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '600' }}>
+                        {formatCents(personOutstanding)} open
+                      </Text>
+                    </View>
                   ) : null}
-                  <Button
-                    title="Vraag betaling"
-                    variant="secondary"
-                    onPress={() => sharePersonRequest(event, person).catch(() => {})}
-                    style={{ flex: 1 }}
-                  />
-                </View>
+
+                  {/* Recording a payment changes what someone owes, so only an admin
+                      phone offers it. The database ignores it from anyone else. */}
+                  {isAdminDevice(event) ? (
+                    <Pressable
+                      onPress={() =>
+                        setPersonPayment(id, person.id, settled ? 0 : personTotal)
+                      }
+                      style={({ pressed }) => ({
+                        marginTop: space.xs,
+                        paddingVertical: 10,
+                        borderRadius: radius.md,
+                        alignItems: 'center',
+                        backgroundColor: settled ? theme.good : theme.chip,
+                        opacity: pressed ? 0.75 : 1,
+                      })}>
+                      <Text
+                        style={{
+                          color: settled ? theme.onGood : theme.text,
+                          fontWeight: '700',
+                          fontSize: 14,
+                        }}>
+                        {settled ? 'Betaald ✓  (tik om ongedaan te maken)' : 'Markeer als betaald'}
+                      </Text>
+                    </Pressable>
+                  ) : settled ? (
+                    <Text
+                      style={{
+                        marginTop: space.xs,
+                        color: theme.good,
+                        fontWeight: '700',
+                        fontSize: 14,
+                        textAlign: 'center',
+                      }}>
+                      Betaald ✓
+                    </Text>
+                  ) : null}
+
+                  {!settled ? (
+                    <View style={{ flexDirection: 'row', gap: space.sm }}>
+                      {isAdminDevice(event) ? (
+                        <Button
+                          title="Deelbetaling"
+                          variant="secondary"
+                          onPress={() => setPayingPerson(person)}
+                          style={{ flex: 1 }}
+                        />
+                      ) : null}
+                      <Button
+                        title="Vraag betaling"
+                        variant="secondary"
+                        onPress={() => sharePersonRequest(event, person).catch(() => {})}
+                        style={{ flex: 1 }}
+                      />
+                    </View>
+                  ) : null}
+                </>
               ) : null}
             </Card>
           );

@@ -8,6 +8,8 @@ create table if not exists public.sessions (
   join_code   text not null unique,
   name        text not null,
   closed      boolean not null default false,
+  -- 'event' for one occasion, 'tab' for the season tab. Fixed at creation.
+  kind        text not null default 'event' check (kind in ('event', 'tab')),
   host_id     uuid not null default auth.uid(),
   created_at  timestamptz not null default now()
 );
@@ -41,7 +43,14 @@ create table if not exists public.session_people (
   paid_cents  integer not null default 0,
   removed_at  timestamptz,
   removed_by  text,
-  paid_at     timestamptz
+  paid_at     timestamptz,
+  -- For someone at an event: the same person's id in the season tab, so their
+  -- turfs there land on the same invoice. Matched by id, never by name.
+  member_id   text,
+  -- 'invoice': onto the quarterly invoice. 'tonight': settled on the night.
+  billing     text not null default 'tonight' check (billing in ('invoice', 'tonight')),
+  -- Who a guest came with: a person id in the same list.
+  guest_of    text
 );
 
 create table if not exists public.session_items (
@@ -103,12 +112,17 @@ set search_path = public as $$
 $$;
 
 -- Creating a session also makes the creator its first member, in one step.
-create or replace function public.create_session(p_id text, p_join_code text, p_name text)
+create or replace function public.create_session(
+  p_id text,
+  p_join_code text,
+  p_name text,
+  p_kind text default 'event'
+)
 returns void language plpgsql security definer
 set search_path = public as $$
 begin
-  insert into public.sessions (id, join_code, name, host_id)
-  values (p_id, upper(p_join_code), p_name, auth.uid());
+  insert into public.sessions (id, join_code, name, host_id, kind)
+  values (p_id, upper(p_join_code), p_name, auth.uid(), coalesce(p_kind, 'event'));
 
   insert into public.session_members (session_id, user_id)
   values (p_id, auth.uid());
@@ -317,6 +331,8 @@ begin
     new.paid_at := old.paid_at;
     new.removed_at := old.removed_at;
     new.removed_by := old.removed_by;
+    new.billing := old.billing;
+    new.member_id := old.member_id;
   end if;
   return new;
 end;
@@ -326,6 +342,31 @@ drop trigger if exists session_people_guard on public.session_people;
 create trigger session_people_guard
   before insert or update or delete on public.session_people
   for each row execute function public.guard_people();
+
+-- What a list is, its join code, and who made it are fixed at creation. Phones
+-- may rename a list and close it; a change to anything else is ignored. The
+-- join code matters beyond tidiness: any phone that joined could otherwise
+-- change it and lock everyone else out of joining.
+create or replace function public.guard_session()
+returns trigger language plpgsql security definer
+set search_path = public as $$
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  new.id := old.id;
+  new.kind := old.kind;
+  new.join_code := old.join_code;
+  new.host_id := old.host_id;
+  new.created_at := old.created_at;
+  return new;
+end;
+$$;
+
+drop trigger if exists sessions_guard on public.sessions;
+create trigger sessions_guard
+  before update on public.sessions
+  for each row execute function public.guard_session();
 
 -- ------------------------------------------------------------- policies ----
 

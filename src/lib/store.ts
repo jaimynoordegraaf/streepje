@@ -13,6 +13,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type {
   AppEvent,
+  Billing,
+  ListKind,
   MenuItem,
   OrderEntry,
   Person,
@@ -32,6 +34,29 @@ export function newJoinCode(): string {
   let code = '';
   for (let i = 0; i < 6; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
   return code;
+}
+
+/**
+ * A person as they join a list. How they pay follows from the list unless said
+ * otherwise: everyone on a tab is invoiced, and at an event someone added by
+ * name is a guest who settles on the night.
+ */
+function newPerson(
+  event: AppEvent,
+  name: string,
+  options: { memberId?: string | null; billing?: Billing; guestOf?: string | null } = {}
+): Person {
+  return {
+    id: newId(),
+    name,
+    paidCents: 0,
+    paidAt: null,
+    removedAt: null,
+    removedBy: null,
+    memberId: options.memberId ?? null,
+    billing: options.billing ?? (event.kind === 'tab' ? 'invoice' : 'tonight'),
+    guestOf: options.guestOf ?? null,
+  };
 }
 
 /** What a brand new install starts with. Edit it freely in Settings. */
@@ -84,12 +109,26 @@ type StoreState = {
    */
   defaultPeople: SavedPerson[];
 
-  createEvent: (name: string) => string;
+  createEvent: (name: string, kind?: ListKind) => string;
   renameEvent: (eventId: string, name: string) => void;
   deleteEvent: (eventId: string) => void;
   setEventClosed: (eventId: string, closed: boolean) => void;
 
-  addPerson: (eventId: string, name: string) => void;
+  /** Add someone by name. At an event that is a guest settling tonight, unless said otherwise. */
+  addPerson: (
+    eventId: string,
+    name: string,
+    options?: { billing?: Billing; guestOf?: string | null }
+  ) => void;
+  /**
+   * Copy members from the season tab into an event, each linked to their row
+   * in the tab by id. Anyone already in the event is skipped.
+   */
+  addMembers: (eventId: string, members: { id: string; name: string }[]) => void;
+  /** How someone pays. Admin-only on a shared list. */
+  setPersonBilling: (eventId: string, personId: string, billing: Billing) => void;
+  /** Who a guest came with. */
+  setGuestOf: (eventId: string, personId: string, guestOf: string | null) => void;
   /** Add several names at once, skipping any already in the event. */
   addPeople: (eventId: string, names: string[]) => void;
   /**
@@ -157,11 +196,12 @@ export const useStore = create<StoreState>()(
       defaultMenu: withIds(STARTER_MENU),
       defaultPeople: [],
 
-      createEvent: (name) => {
+      createEvent: (name, kind = 'event') => {
         const id = newId();
         const event: AppEvent = {
           id,
-          name: name.trim() || 'Naamloos evenement',
+          name: name.trim() || (kind === 'tab' ? 'Lopende rekening' : 'Naamloos evenement'),
+          kind,
           createdAt: Date.now(),
           people: [],
           // Copy the default menu and give each item a fresh id, so editing this
@@ -191,19 +231,12 @@ export const useStore = create<StoreState>()(
       setEventClosed: (eventId, closed) =>
         set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, closed })) }),
 
-      addPerson: (eventId, name) =>
+      addPerson: (eventId, name, options) =>
         set({
-          events: mapEvent(get().events, eventId, (event) => {
-            const person: Person = {
-              id: newId(),
-              name: name.trim() || 'Iemand',
-              paidCents: 0,
-              paidAt: null,
-              removedAt: null,
-              removedBy: null,
-            };
-            return { ...event, people: [...event.people, person] };
-          }),
+          events: mapEvent(get().events, eventId, (event) => ({
+            ...event,
+            people: [...event.people, newPerson(event, name.trim() || 'Iemand', options)],
+          })),
         }),
 
       addPeople: (eventId, names) =>
@@ -213,14 +246,25 @@ export const useStore = create<StoreState>()(
             const fresh = names
               .map((name) => name.trim())
               .filter((name) => name !== '' && !taken.has(name.toLowerCase()))
-              .map((name) => ({
-                id: newId(),
-                name,
-                paidCents: 0,
-                paidAt: null,
-                removedAt: null,
-                removedBy: null,
-              }));
+              .map((name) => newPerson(event, name));
+            return { ...event, people: [...event.people, ...fresh] };
+          }),
+        }),
+
+      addMembers: (eventId, members) =>
+        set({
+          events: mapEvent(get().events, eventId, (event) => {
+            // A member already in this event -- even one since removed -- is
+            // not added a second time. Two rows for one member would split
+            // their turfs across two lines of the invoice.
+            const present = new Set(
+              event.people.map((person) => person.memberId).filter((memberId) => memberId !== null)
+            );
+            const fresh = members
+              .filter((member) => !present.has(member.id))
+              .map((member) =>
+                newPerson(event, member.name, { memberId: member.id, billing: 'invoice' })
+              );
             return { ...event, people: [...event.people, ...fresh] };
           }),
         }),
@@ -230,21 +274,42 @@ export const useStore = create<StoreState>()(
         set({
           events: mapEvent(get().events, eventId, (event) => {
             // Numbered so several unknowns in one evening stay apart until
-            // someone remembers who they were.
-            const used = event.people.filter((person) => /^Onbekend( d+)?$/.test(person.name));
-            const person: Person = {
-              id,
-              name: `Onbekend ${used.length + 1}`,
-              paidCents: 0,
-              paidAt: null,
-              removedAt: null,
-              removedBy: null,
+            // someone remembers who they were. The digits are matched with
+            // [0-9], not a backslash escape: this pattern once lost its
+            // backslash, matched nothing, and named every unknown "Onbekend 1".
+            const highest = event.people.reduce((max, person) => {
+              const match = /^Onbekend( [0-9]+)?$/.exec(person.name);
+              if (!match) return max;
+              return Math.max(max, match[1] ? Number(match[1]) : 1);
+            }, 0);
+            return {
+              ...event,
+              people: [...event.people, { ...newPerson(event, `Onbekend ${highest + 1}`), id }],
             };
-            return { ...event, people: [...event.people, person] };
           }),
         });
         return id;
       },
+
+      setPersonBilling: (eventId, personId, billing) =>
+        set({
+          events: mapEvent(get().events, eventId, (event) => ({
+            ...event,
+            people: event.people.map((person) =>
+              person.id === personId ? { ...person, billing } : person
+            ),
+          })),
+        }),
+
+      setGuestOf: (eventId, personId, guestOf) =>
+        set({
+          events: mapEvent(get().events, eventId, (event) => ({
+            ...event,
+            people: event.people.map((person) =>
+              person.id === personId ? { ...person, guestOf } : person
+            ),
+          })),
+        }),
 
       renamePerson: (eventId, personId, name) =>
         set({
@@ -475,7 +540,7 @@ export const useStore = create<StoreState>()(
     {
       name: 'turf-store-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 9,
+      version: 10,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -630,6 +695,22 @@ export const useStore = create<StoreState>()(
                 }
               : event
           );
+        }
+
+        if (fromVersion < 10) {
+          // Lists gain a kind and people learn how they pay. Everything that
+          // already existed was an evening where people settled up at the end,
+          // so that is what it stays.
+          state.events = (state.events ?? []).map((event: any) => ({
+            ...event,
+            kind: event.kind ?? 'event',
+            people: (event.people ?? []).map((person: any) => ({
+              ...person,
+              memberId: person.memberId ?? null,
+              billing: person.billing ?? 'tonight',
+              guestOf: person.guestOf ?? null,
+            })),
+          }));
         }
 
         return state;

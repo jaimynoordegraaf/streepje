@@ -27,6 +27,8 @@ import {
   personItemCount,
   personLines,
   personTotalCents,
+  eventInvoiceCents,
+  paysTonight,
 } from './totals';
 import type { AppEvent, Person } from './types';
 
@@ -97,13 +99,17 @@ export function buildCsv(event: AppEvent, local?: LocalDevice): string {
   rows.push('');
 
   rows.push(csvRow(['OVERZICHT']));
-  rows.push(csvRow(['Persoon', 'Consumpties', 'Totaal', 'Betaald', 'Openstaand', 'Betaald op']));
+  rows.push(
+    csvRow(['Persoon', 'Consumpties', 'Totaal', 'Afrekening', 'Gast van', 'Betaald', 'Openstaand', 'Betaald op'])
+  );
   for (const person of activePeople(event)) {
     rows.push(
       csvRow([
         person.name,
         personItemCount(event, person.id),
         centsToPlainNumber(personTotalCents(event, person.id)),
+        paysTonight(event, person) ? 'vanavond' : 'op factuur',
+        event.people.find((host) => host.id === person.guestOf)?.name ?? '',
         centsToPlainNumber(person.paidCents),
         centsToPlainNumber(personOutstandingCents(event, person)),
         person.paidAt ? formatDateTime(person.paidAt) : '',
@@ -115,6 +121,7 @@ export function buildCsv(event: AppEvent, local?: LocalDevice): string {
   rows.push(csvRow(['Eindtotaal', '', centsToPlainNumber(eventTotalCents(event))]));
   rows.push(csvRow(['Ontvangen', '', centsToPlainNumber(eventPaidCents(event))]));
   rows.push(csvRow(['Openstaand', '', centsToPlainNumber(eventOutstandingCents(event))]));
+  rows.push(csvRow(['Op factuur', '', centsToPlainNumber(eventInvoiceCents(event))]));
 
   // Every removal, so the paper record shows what was taken off and when.
   // Without this the CSV shows only the net result, and a turf that was
@@ -173,7 +180,9 @@ export function buildSummaryText(event: AppEvent): string {
     const total = personTotalCents(event, person.id);
     const detail = consumedText(event, person.id);
     const outstanding = personOutstandingCents(event, person);
-    const status = isSettled(event, person)
+    const status = !paysTonight(event, person)
+      ? ' (op factuur)'
+      : isSettled(event, person)
       ? ' (betaald)'
       : person.paidCents > 0
         ? ` (${formatCents(person.paidCents)} betaald, ${formatCents(outstanding)} open)`

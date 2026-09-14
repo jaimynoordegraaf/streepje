@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-nat
 import QRCode from 'react-native-qrcode-svg';
 
 import { Text } from '@/components/text';
-import { PromptModal } from '@/components/modals';
+import { PromptModal, whenAlertClosed } from '@/components/modals';
 import { PinModal } from '@/components/pin-modal';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { describeError } from '@/lib/errors';
@@ -119,7 +119,7 @@ export default function ShareScreen() {
               doWipe();
               return;
             }
-            setWipeAsk(event.correctionPin ? 'verify' : 'set');
+            whenAlertClosed(() => setWipeAsk(event.correctionPin ? 'verify' : 'set'));
           },
         },
       ]
@@ -182,7 +182,7 @@ export default function ShareScreen() {
               return;
             }
             setAdminChange(change);
-            setAdminAsk(event.correctionPin ? 'verify' : 'set');
+            whenAlertClosed(() => setAdminAsk(event.correctionPin ? 'verify' : 'set'));
           },
         },
       ]
