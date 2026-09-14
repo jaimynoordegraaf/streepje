@@ -9,6 +9,7 @@ import { PromptModal } from '@/components/modals';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import type { SavedPerson } from '@/lib/types';
+import { versionLine } from '@/lib/version';
 import { space, useTheme } from '@/theme';
 
 export default function SettingsScreen() {
@@ -97,6 +98,10 @@ export default function SettingsScreen() {
             kan niet ongedaan worden gemaakt.
           </Text>
         </View>
+
+        <Text style={{ color: theme.textDim, fontSize: 12, textAlign: 'center', marginTop: space.md }}>
+          {versionLine()}
+        </Text>
       </ScrollView>
 
       <PromptModal
