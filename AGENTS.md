@@ -43,3 +43,34 @@ Before calling a change done:
   which also allows testing sync between the two platforms on one shared list.
 - **Release both:** the Android bundle from `scripts/build-android-local.mjs`, and an
   EAS iOS build submitted to TestFlight.
+
+# Over-the-air updates
+
+From 1.0.3 the app has `expo-updates`. It checks for an update when it opens, downloads
+it in the background and applies it the next time it starts. An update replaces only
+the JavaScript bundle and its assets.
+
+**Which builds an update reaches.** `runtimeVersion` uses the `appVersion` policy, so the
+runtime version is the `version` in `app.json`. An update published from 1.0.3 code only
+reaches 1.0.3 builds. Not the fingerprint policy: Android is built on this Windows PC and
+iOS on EAS, and both would have to compute the same fingerprint.
+
+**Anything native needs a new version and new store builds, never an update.** That means
+adding or upgrading a library with native code, an Expo SDK upgrade, and any change to
+the native side of `app.json` (permissions, icons, splash, plugins, identifiers). Bump
+`version`, then build both platforms. Publishing JavaScript that expects native code the
+installed build does not have crashes the app on launch, on every phone at once.
+
+**The channel is `production` in two places, and both must stay the same.** EAS Build
+reads `build.production.channel` in `eas.json`. The local Android build is not made by
+EAS Build, so it takes the channel from `updates.requestHeaders.expo-channel-name` in
+`app.json`.
+
+**Publishing.** Test the change on both phones first, as for any change. Then:
+
+    npx eas-cli@latest update --channel production --environment production --message "..."
+
+`--environment production` is required from SDK 55 and supplies the Supabase URL and
+publishable key, which are stored as EAS environment variables. Without them an update
+would switch sharing off on every phone. A bad update is undone by publishing the previous
+good commit again (`eas update:republish`) or with `eas update:rollback`.

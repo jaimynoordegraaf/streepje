@@ -2,7 +2,16 @@
   "expo": {
     "name": "streepje",
     "slug": "streeplijst",
-    "version": "1.0.2",
+    "version": "1.0.3",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/980bc886-c437-4e7e-b546-acf656335999",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "streepje",
