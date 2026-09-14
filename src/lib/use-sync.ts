@@ -34,6 +34,7 @@ export function useEventSync(event: AppEvent | undefined) {
   const mergeRemoteEntries = useStore((state) => state.mergeRemoteEntries);
   const mergeRemoteDetails = useStore((state) => state.mergeRemoteDetails);
   const markEntriesSynced = useStore((state) => state.markEntriesSynced);
+  const dropEntries = useStore((state) => state.dropEntries);
   const noteSynced = useStore((state) => state.noteSynced);
   const setShareRole = useStore((state) => state.setShareRole);
 
@@ -151,9 +152,16 @@ export function useEventSync(event: AppEvent | undefined) {
 
     let cancelled = false;
     pushEntries(event.id, rows)
-      .then(() => {
+      .then((refused) => {
         if (cancelled) return;
-        markEntriesSynced(event.id, rows.map((row) => row.id));
+        // A refused removal will never be accepted, so retrying it would only
+        // hold up every turf queued behind it. It goes, like on the server.
+        const dropped = new Set(refused);
+        markEntriesSynced(
+          event.id,
+          rows.map((row) => row.id).filter((entryId) => !dropped.has(entryId))
+        );
+        dropEntries(event.id, refused);
         noteSynced(event.id);
       })
       .catch(() => {
@@ -164,7 +172,7 @@ export function useEventSync(event: AppEvent | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [status, pending, event, markEntriesSynced, noteSynced]);
+  }, [status, pending, event, markEntriesSynced, dropEntries, noteSynced]);
 
   // Send edits to people, the menu and the event name.
   useEffect(() => {

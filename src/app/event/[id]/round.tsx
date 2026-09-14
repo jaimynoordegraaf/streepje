@@ -36,6 +36,16 @@ export default function RoundScreen() {
     );
   }
 
+  // The Rondje button is disabled on a closed event; this covers arriving anyway.
+  if (event.closed) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: 'Rondje' }} />
+        <EmptyState title="Dit evenement is afgesloten" hint="Er kan niet meer geturfd worden." />
+      </Screen>
+    );
+  }
+
   const item = activeMenu(event).find((candidate) => candidate.id === itemId) ?? null;
   const ready = item !== null && chosen.length > 0;
 

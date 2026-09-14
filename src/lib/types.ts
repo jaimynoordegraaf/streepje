@@ -180,7 +180,11 @@ export type AppEvent = {
    * Filled while offline and drained once the connection comes back.
    */
   unsyncedEntryIds: string[];
-  /** Closed events are done and settled; kept for the record. */
+  /**
+   * A closed event is finished: it takes no more turfs and no new people, but
+   * payments and the export still work. Only an admin closes or reopens it, and
+   * a tab is never closed.
+   */
   closed: boolean;
   /** Null while the event lives only on this phone. */
   share: ShareInfo | null;

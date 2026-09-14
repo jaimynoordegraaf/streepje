@@ -73,6 +73,7 @@ export default function PersonScreen() {
    * single tap.
    */
   const requestRemoval = (item: MenuItem) => {
+    if (event.closed) return;
     const block = correctionBlock(event);
 
     if (!block.allowed && block.reason === 'not-admin') {
@@ -117,7 +118,7 @@ export default function PersonScreen() {
           <StepButton
             icon={(color, size) => <CrossIcon size={size} color={color} />}
             onPress={() => requestRemoval(item)}
-            disabled={quantity === 0}
+            disabled={event.closed || quantity === 0}
           />
           <Text
             style={{
@@ -132,6 +133,8 @@ export default function PersonScreen() {
           <StepButton
             icon={(color, size) => <CheckIcon size={size} color={color} />}
             tone="accent"
+            // A closed event is only looked at: what someone had, not adding to it.
+            disabled={event.closed}
             onPress={() => addOrder(id, person.id, item.id, 1)}
           />
         </View>
@@ -159,7 +162,11 @@ export default function PersonScreen() {
               <Text style={{ color: theme.textDim, fontSize: 14 }}>
                 {personItemCount(event, person.id)} consumpties
               </Text>
-              {unlocked ? (
+              {event.closed ? (
+                <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '600' }}>
+                  Afgesloten
+                </Text>
+              ) : unlocked ? (
                 <Text style={{ color: theme.danger, fontSize: 12, fontWeight: '600' }}>
                   Correcties ontgrendeld
                 </Text>

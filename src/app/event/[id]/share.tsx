@@ -31,6 +31,7 @@ export default function ShareScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const event = useEvent(id);
   const setShare = useStore((state) => state.setShare);
+  const dropEntries = useStore((state) => state.dropEntries);
   const setCorrectionPin = useStore((state) => state.setCorrectionPin);
   const rememberedName = useStore((state) => state.deviceName);
   const setDeviceName = useStore((state) => state.setDeviceName);
@@ -57,7 +58,9 @@ export default function ShareScreen() {
     setBusy(true);
     try {
       // May differ from the code we proposed, if the event was already online.
-      const joinCode = await hostSession(event, newJoinCode());
+      const { joinCode, refusedEntryIds } = await hostSession(event, newJoinCode());
+      // Removals this phone made as an admin of a list it no longer administers.
+      dropEntries(id, refusedEntryIds);
       setShare(id, { joinCode, role: 'admin', lastSyncedAt: Date.now() });
       setDeviceName(hostName);
       // Without this the host would be the one phone missing from its own list.

@@ -217,6 +217,7 @@ export default function EventScreen() {
           <Button
             title="Rondje"
             variant="secondary"
+            disabled={event.closed}
             onPress={() => router.push({ pathname: '/event/[id]/round', params: { id } })}
             style={{ flex: 1 }}
           />
@@ -246,6 +247,14 @@ export default function EventScreen() {
         contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: space.xxl }}
         ListHeaderComponent={
           <View style={{ gap: space.md, marginBottom: space.xs }}>
+            {event.closed ? (
+              <Card style={{ gap: space.xs, borderColor: theme.textDim }}>
+                <Text style={{ color: theme.text, fontSize: 15, fontWeight: '700' }}>Afgesloten</Text>
+                <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+                  Er kan niet meer geturfd worden. Betalingen en exporteren via Totalen blijven werken.
+                </Text>
+              </Card>
+            ) : null}
             <SummaryCard
               kind={event.kind}
               total={eventTotalCents(event)}
@@ -263,7 +272,7 @@ export default function EventScreen() {
           </View>
         }
         ListFooterComponent={
-          tab ? (
+          event.closed ? null : tab ? (
             <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
               <Button
                 title="Lid toevoegen"
@@ -297,7 +306,9 @@ export default function EventScreen() {
           <EmptyState
             title={tab ? 'Nog geen leden' : 'Nog niemand toegevoegd'}
             hint={
-              tab
+              event.closed
+                ? undefined
+                : tab
                 ? 'Voeg de leden van de groep toe en tik daarna op een naam om te turven. Alles gaat op de factuur.'
                 : 'Kies leden uit de lopende rekening of voeg een gast toe, en tik daarna op een naam om te turven.'
             }

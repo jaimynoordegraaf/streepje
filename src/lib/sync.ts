@@ -157,9 +157,13 @@ function client() {
  *
  * Returns the join code actually in use, which is not always the one asked
  * for: an event can already be online, and then its existing code is the one
- * that works.
+ * that works. Also returns the turfs the server refused (see pushEntries), for
+ * the caller to drop.
  */
-export async function hostSession(event: AppEvent, joinCode: string): Promise<string> {
+export async function hostSession(
+  event: AppEvent,
+  joinCode: string
+): Promise<{ joinCode: string; refusedEntryIds: string[] }> {
   await ensureSignedIn();
   const db = client();
 
@@ -195,16 +199,16 @@ export async function hostSession(event: AppEvent, joinCode: string): Promise<st
       }
 
       await pushDetails(event);
-      await pushEntries(event.id, event.entries);
-      return data.join_code as string;
+      const refusedEntryIds = await pushEntries(event.id, event.entries);
+      return { joinCode: data.join_code as string, refusedEntryIds };
     }
 
     throw error;
   }
 
   await pushDetails(event);
-  await pushEntries(event.id, event.entries);
-  return joinCode;
+  const refusedEntryIds = await pushEntries(event.id, event.entries);
+  return { joinCode, refusedEntryIds };
 }
 
 /** Join someone else's session using the code from their QR. */
@@ -348,14 +352,20 @@ export async function removeAdmin(sessionId: string, userId: string): Promise<vo
 }
 
 /**
- * Send order rows.
+ * Send order rows, and return the ids of any the server refused.
  *
  * `ignoreDuplicates` makes this safe to call repeatedly: a row already on the
  * server is skipped rather than treated as an error, so retrying after a
  * dropped connection can never double-count an order.
+ *
+ * The server quietly drops a turf removal from a phone that is not an admin,
+ * such as one that lost admin while a removal was still queued, instead of
+ * failing the whole batch. Rows are never deleted, so a removal that is not on
+ * the server once this returns was refused. The caller should drop it from
+ * this phone as well, or its totals would differ from every other phone's.
  */
-export async function pushEntries(sessionId: string, entries: OrderEntry[]): Promise<void> {
-  if (entries.length === 0) return;
+export async function pushEntries(sessionId: string, entries: OrderEntry[]): Promise<string[]> {
+  if (entries.length === 0) return [];
   const db = client();
 
   const { error } = await db
@@ -365,6 +375,23 @@ export async function pushEntries(sessionId: string, entries: OrderEntry[]): Pro
       ignoreDuplicates: true,
     });
   if (error) throw error;
+
+  // Only removals can be refused, so only those are checked. In batches, since
+  // the ids travel in the URL and re-sharing sends every turf at once.
+  const removals = entries.filter((entry) => entry.delta <= 0).map((entry) => entry.id);
+  const refused: string[] = [];
+  for (let start = 0; start < removals.length; start += 100) {
+    const batch = removals.slice(start, start + 100);
+    const { data, error: readError } = await db
+      .from('order_entries')
+      .select('id')
+      .eq('session_id', sessionId)
+      .in('id', batch);
+    if (readError) throw readError;
+    const stored = new Set((data ?? []).map((row: { id: string }) => row.id));
+    refused.push(...batch.filter((id) => !stored.has(id)));
+  }
+  return refused;
 }
 
 /** Send the parts that are edited rather than appended. */

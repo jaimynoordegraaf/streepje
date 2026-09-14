@@ -184,6 +184,12 @@ type StoreState = {
     details: { name: string; closed: boolean; people: Person[]; menu: MenuItem[] }
   ) => void;
   markEntriesSynced: (eventId: string, entryIds: string[]) => void;
+  /**
+   * Forget turfs the server refused: removals made on a phone that was no longer
+   * an admin. They never reached the shared list, so keeping them here would
+   * leave this phone's totals different from everyone else's.
+   */
+  dropEntries: (eventId: string, entryIds: string[]) => void;
   noteSynced: (eventId: string) => void;
 };
 
@@ -229,19 +235,32 @@ export const useStore = create<StoreState>()(
         set({ events: get().events.filter((event) => event.id !== eventId) }),
 
       setEventClosed: (eventId, closed) =>
-        set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, closed })) }),
-
-      addPerson: (eventId, name, options) =>
         set({
           events: mapEvent(get().events, eventId, (event) => ({
             ...event,
-            people: [...event.people, newPerson(event, name.trim() || 'Iemand', options)],
+            // The season tab runs for good; the server ignores closing one too.
+            closed: event.kind === 'tab' ? false : closed,
           })),
+        }),
+
+      // Adding people and turfs does nothing on a closed event. The screens hide
+      // those buttons already; this catches any way round them.
+      addPerson: (eventId, name, options) =>
+        set({
+          events: mapEvent(get().events, eventId, (event) =>
+            event.closed
+              ? event
+              : {
+                  ...event,
+                  people: [...event.people, newPerson(event, name.trim() || 'Iemand', options)],
+                }
+          ),
         }),
 
       addPeople: (eventId, names) =>
         set({
           events: mapEvent(get().events, eventId, (event) => {
+            if (event.closed) return event;
             const taken = new Set(event.people.map((person) => person.name.toLowerCase()));
             const fresh = names
               .map((name) => name.trim())
@@ -254,6 +273,7 @@ export const useStore = create<StoreState>()(
       addMembers: (eventId, members) =>
         set({
           events: mapEvent(get().events, eventId, (event) => {
+            if (event.closed) return event;
             // A member already in this event -- even one since removed -- is
             // not added a second time. Two rows for one member would split
             // their turfs across two lines of the invoice.
@@ -273,6 +293,7 @@ export const useStore = create<StoreState>()(
         const id = newId();
         set({
           events: mapEvent(get().events, eventId, (event) => {
+            if (event.closed) return event;
             // Numbered so several unknowns in one evening stay apart until
             // someone remembers who they were. The digits are matched with
             // [0-9], not a backslash escape: this pattern once lost its
@@ -403,6 +424,7 @@ export const useStore = create<StoreState>()(
       addOrder: (eventId, personId, itemId, delta) =>
         set({
           events: mapEvent(get().events, eventId, (event) => {
+            if (event.closed) return event;
             const item = event.menu.find((candidate) => candidate.id === itemId);
             const entry: OrderEntry = {
               id: newId(),
@@ -529,6 +551,19 @@ export const useStore = create<StoreState>()(
             };
           }),
         }),
+
+      dropEntries: (eventId, entryIds) => {
+        // Almost every push has nothing refused; skip the write then.
+        if (entryIds.length === 0) return;
+        const refused = new Set(entryIds);
+        set({
+          events: mapEvent(get().events, eventId, (event) => ({
+            ...event,
+            entries: event.entries.filter((entry) => !refused.has(entry.id)),
+            unsyncedEntryIds: event.unsyncedEntryIds.filter((id) => !refused.has(id)),
+          })),
+        });
+      },
 
       noteSynced: (eventId) =>
         set({

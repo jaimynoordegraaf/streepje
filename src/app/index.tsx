@@ -91,12 +91,14 @@ export default function EventsScreen() {
   const createEvent = useStore((state) => state.createEvent);
   const [creating, setCreating] = useState(false);
 
-  // The season tab is where most evenings happen, so it sits at the top.
-  // Within each group the order is the store's: newest first.
+  // The season tab is where most evenings happen, so it sits at the top, and
+  // closed events are finished, so they sink to the bottom. Within each group
+  // the order is the store's: newest first.
   const ordered = useMemo(
     () => [
       ...events.filter((event) => event.kind === 'tab'),
-      ...events.filter((event) => event.kind !== 'tab'),
+      ...events.filter((event) => event.kind !== 'tab' && !event.closed),
+      ...events.filter((event) => event.kind !== 'tab' && event.closed),
     ],
     [events]
   );

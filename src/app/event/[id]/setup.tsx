@@ -51,6 +51,7 @@ export default function SetupScreen() {
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeAsk, setRemoveAsk] = useState<'verify' | 'set' | null>(null);
   const [deleteAsk, setDeleteAsk] = useState<'verify' | 'set' | null>(null);
+  const [reopenAsk, setReopenAsk] = useState<'verify' | 'set' | null>(null);
   const bottomInset = useBottomInset();
 
   if (!event) {
@@ -164,6 +165,36 @@ export default function SetupScreen() {
     );
   };
 
+  /**
+   * Closing freezes the evening: no more turfs and no new people. Closing is
+   * confirmed once. Reopening needs the PIN, because it lets turfs be added to
+   * an evening whose money may already have been counted.
+   */
+  const confirmClose = () => {
+    Alert.alert(
+      `${event.name} afsluiten?`,
+      'Daarna kan er niet meer geturfd worden en kan er niemand meer bij. Betalingen en exporteren blijven werken. Heropenen kan alleen met de correctiecode.',
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        { text: 'Afsluiten', onPress: () => setEventClosed(id, true) },
+      ]
+    );
+  };
+
+  const requestReopen = () => {
+    if (correctionsUnlocked(id)) {
+      setEventClosed(id, false);
+      return;
+    }
+    setReopenAsk(event.correctionPin ? 'verify' : 'set');
+  };
+
+  const reopen = () => {
+    unlockCorrections(id);
+    setEventClosed(id, false);
+    setReopenAsk(null);
+  };
+
   /** How many of this item have already been logged across everyone. */
   const loggedCount = (itemId: string) =>
     event.entries.reduce((sum, entry) => (entry.itemId === itemId ? sum + entry.delta : sum), 0);
@@ -219,9 +250,12 @@ export default function SetupScreen() {
                   <Pressable onPress={() => setRenamingPerson(person)} hitSlop={8}>
                     <Text style={{ color: theme.link, fontWeight: '600' }}>Hernoemen</Text>
                   </Pressable>
-                  <Pressable onPress={() => confirmRemovePerson(person)} hitSlop={8}>
-                    <Text style={{ color: theme.danger, fontWeight: '600' }}>Verwijderen</Text>
-                  </Pressable>
+                  {/* Removing someone changes the takings, so not on a closed event. */}
+                  {event.closed ? null : (
+                    <Pressable onPress={() => confirmRemovePerson(person)} hitSlop={8}>
+                      <Text style={{ color: theme.danger, fontWeight: '600' }}>Verwijderen</Text>
+                    </Pressable>
+                  )}
                 </View>
               </Card>
             ))
@@ -243,7 +277,7 @@ export default function SetupScreen() {
                         {person.removedBy ? ` · ${person.removedBy}` : ''}
                       </Text>
                     </View>
-                    {isAdminDevice(event) ? (
+                    {isAdminDevice(event) && !event.closed ? (
                       <Pressable onPress={() => restorePerson(id, person.id)} hitSlop={8}>
                         <Text style={{ color: theme.link, fontWeight: '600' }}>Terugzetten</Text>
                       </Pressable>
@@ -254,9 +288,15 @@ export default function SetupScreen() {
             </View>
           ) : null}
 
-          <Button title="Persoon toevoegen" variant="secondary" onPress={() => setAddingPerson(true)} />
+          {event.closed ? (
+            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+              Dit evenement is afgesloten. Heropen het om iemand toe te voegen of te verwijderen.
+            </Text>
+          ) : (
+            <Button title="Persoon toevoegen" variant="secondary" onPress={() => setAddingPerson(true)} />
+          )}
 
-          {defaultPeople.length > 0 ? (
+          {defaultPeople.length > 0 && !event.closed ? (
             <Button
               title={`Vaste namen toevoegen (${
                 defaultPeople.filter(
@@ -329,11 +369,21 @@ export default function SetupScreen() {
 
         <View style={{ gap: space.sm }}>
           <SectionTitle>Afronden</SectionTitle>
-          <Button
-            title={event.closed ? 'Evenement heropenen' : 'Evenement afsluiten'}
-            variant="secondary"
-            onPress={() => setEventClosed(id, !event.closed)}
-          />
+          {/* A season tab runs for good, so there is nothing to close. */}
+          {event.kind === 'event' && isAdminDevice(event) ? (
+            <Button
+              title={event.closed ? 'Evenement heropenen' : 'Evenement afsluiten'}
+              variant="secondary"
+              onPress={event.closed ? requestReopen : confirmClose}
+            />
+          ) : null}
+          {event.kind === 'event' && !isAdminDevice(event) ? (
+            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+              {event.closed
+                ? 'Dit evenement is afgesloten. Alleen een beheertelefoon kan het heropenen.'
+                : 'Alleen een beheertelefoon kan dit evenement afsluiten.'}
+            </Text>
+          ) : null}
           <Button title="Evenement verwijderen" variant="danger" onPress={confirmDeleteEvent} />
         </View>
       </ScrollView>
@@ -435,6 +485,25 @@ export default function SetupScreen() {
           setCorrectionPin(id, record);
           setDeleteAsk(null);
           doDeleteEvent();
+        }}
+      />
+
+      <PinModal
+        visible={reopenAsk !== null}
+        mode={reopenAsk === 'set' ? 'set' : 'verify'}
+        eventId={id}
+        record={event.correctionPin}
+        title="Evenement heropenen"
+        explanation={
+          reopenAsk === 'set'
+            ? 'Er is nog geen correctiecode. Kies er een; die is vanaf nu nodig om te heropenen en om turfjes weg te halen.'
+            : 'Voer de code in om dit evenement te heropenen.'
+        }
+        onCancel={() => setReopenAsk(null)}
+        onVerified={reopen}
+        onSet={(record) => {
+          setCorrectionPin(id, record);
+          reopen();
         }}
       />
 

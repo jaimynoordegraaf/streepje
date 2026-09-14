@@ -244,6 +244,28 @@ create trigger order_entries_fill_price
   before insert on public.order_entries
   for each row execute function public.fill_entry_price();
 
+-- Removing a turf is an admin's to do. A removal from anyone else is dropped
+-- quietly rather than refused: a phone that lost admin while it still had one
+-- queued would otherwise fail every batch it sends, and stay offline for good.
+-- The app sees the row is missing afterwards and drops it from its own copy.
+create or replace function public.guard_entry()
+returns trigger language plpgsql security definer
+set search_path = public as $$
+begin
+  if auth.uid() is not null
+     and new.delta <= 0
+     and not public.is_admin(new.session_id) then
+    return null;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists order_entries_guard on public.order_entries;
+create trigger order_entries_guard
+  before insert on public.order_entries
+  for each row execute function public.guard_entry();
+
 -- The menu, and with it every price, is an admin's to change. A change from
 -- anyone else is ignored rather than refused: every phone pushes its whole
 -- menu, and refusing a stale copy would stop that phone syncing at all.
@@ -344,9 +366,10 @@ create trigger session_people_guard
   for each row execute function public.guard_people();
 
 -- What a list is, its join code, and who made it are fixed at creation. Phones
--- may rename a list and close it; a change to anything else is ignored. The
--- join code matters beyond tidiness: any phone that joined could otherwise
--- change it and lock everyone else out of joining.
+-- may rename a list; only an admin may close or reopen it, since a closed event
+-- takes no more turfs, and a season tab is never closed. A change to anything
+-- else is ignored. The join code matters beyond tidiness: any phone that joined
+-- could otherwise change it and lock everyone else out of joining.
 create or replace function public.guard_session()
 returns trigger language plpgsql security definer
 set search_path = public as $$
@@ -359,6 +382,12 @@ begin
   new.join_code := old.join_code;
   new.host_id := old.host_id;
   new.created_at := old.created_at;
+  if not public.is_admin(old.id) then
+    new.closed := old.closed;
+  end if;
+  if new.kind = 'tab' then
+    new.closed := false;
+  end if;
   return new;
 end;
 $$;
@@ -406,17 +435,15 @@ create policy items_rw on public.session_items
   for all using (public.is_member(session_id)) with check (public.is_member(session_id));
 
 -- Entries can be read and added by members, but never changed or removed:
--- there is deliberately no update or delete policy.
+-- there is deliberately no update or delete policy. Which phones may add a
+-- removal is guard_entry's job above.
 drop policy if exists entries_read on public.order_entries;
 create policy entries_read on public.order_entries
   for select using (public.is_member(session_id));
 
 drop policy if exists entries_insert on public.order_entries;
 create policy entries_insert on public.order_entries
-  for insert with check (
-    public.is_member(session_id)
-    and (delta > 0 or public.is_admin(session_id))
-  );
+  for insert with check (public.is_member(session_id));
 
 -- Every phone in a list can see who its admins are. Adding and removing goes
 -- through add_admin and remove_admin, which check who is asking.
