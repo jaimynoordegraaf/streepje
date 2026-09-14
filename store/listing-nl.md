@@ -1,6 +1,8 @@
 # Play Store listing (nl-NL)
 
 Paste-ready text for Play Console → Store listing. Character limits in brackets.
+Written for 1.0.3: season tab, members and guests, admin phones, closing events, and
+over-the-air updates. Keep it in step with `appstore-nl.md`.
 
 ## App name [30]
 
@@ -11,41 +13,47 @@ streepje
 ## Short description [80]
 
 ```
-Turf wie wat drinkt en eet, en zie wie aan het eind nog moet betalen.
+Turf wie wat drinkt en eet, voor evenementen en de lopende rekening.
 ```
 
 ## Full description [4000]
 
 ```
-streepje houdt bij wie op een evenement wat gedronken en gegeten heeft, en wie er aan het eind nog moet betalen. Gemaakt voor de bar van een scoutinggroep, waar het meestal druk is, het net traag en de administratie een bierviltje.
+streepje houdt bij wie wat gedronken en gegeten heeft, en wie daarvoor betaalt. Gemaakt voor de bar van een scoutinggroep, waar het meestal druk is, het bereik slecht en de administratie een bierviltje.
 
 EEN TIK PER BESTELLING
 
-Maak een evenement, zet erin wie er zijn, en tik. Elke tik is meteen vastgelegd. Bij de totalen zie je per persoon wat er staat en wat er nog openstaat.
+Tik op een naam en daarna op wat iemand neemt. Elke tik is meteen vastgelegd, met de prijs van dat moment. Neemt een groep een rondje, dan kies je het drankje één keer en vink je de namen aan.
 
-WERKT ZONDER BEREIK
+DE LOPENDE REKENING
 
-Alles staat op de telefoon zelf. Geen account, geen inloggen, geen wachten op een server. Valt het signaal weg, dan merk je er niets van: je turft gewoon door.
+Voor de gewone baravonden houd je één lijst bij voor het hele seizoen. Niemand hoeft aan de bar te betalen: de penningmeester stuurt de leden per kwartaal een factuur.
+
+EVENEMENTEN MET LEDEN EN GASTEN
+
+Voor een feest of een weekend weg maak je een evenement. Leden haal je in één keer uit de lopende rekening, en wat zij nemen gaat op de factuur. Gasten betalen aan het eind van de avond, bijvoorbeeld met een betaalverzoek, of gaan ook op de factuur. Een evenement kan zijn eigen prijzen hebben.
 
 MET MEERDERE TELEFOONS TEGELIJK
 
-Zet delen aan en de andere telefoons doen mee door een QR-code te scannen. Iedereen ziet dezelfde lopende totalen, ook als er twee mensen tegelijk een bestelling opnemen. Een telefoon die even offline is, loopt daarna vanzelf bij.
+Deel een lijst en de andere telefoons doen mee door een QR-code te scannen of een code in te typen. Iedereen ziet dezelfde lopende totalen, ook als er twee mensen tegelijk een bestelling opnemen.
+
+WERKT ZONDER BEREIK
+
+Alles staat op de telefoon zelf. Valt het signaal weg, dan turf je gewoon door. Zodra er weer verbinding is, loopt de telefoon vanzelf bij.
 
 WEGHALEN KAN NIET ZOMAAR
 
-Een turf weghalen haalt geld van iemands rekening af. Dat kan daarom alleen op de telefoon die het evenement deelt, en alleen met de correctiecode. Elke correctie blijft zichtbaar: bij de persoon, bij de totalen en in de export. Ook iemand verwijderen of het evenement weggooien zit achter die code.
-
-BETALEN, HEEL OF EEN DEEL
-
-Markeer iemand als betaald, of leg vast dat er een deel is afgerekend. Het restant blijft staan tot het klopt.
+Een turfje weghalen haalt geld van iemands rekening. Dat kan alleen op een beheertelefoon en alleen met de correctiecode, en elke correctie blijft zichtbaar in de totalen en de export. Ook betalingen vastleggen, het menu en de prijzen aanpassen en een evenement afsluiten kan alleen op een beheertelefoon. Een lijst kan meerdere beheerders hebben.
 
 AAN HET EIND
 
-Exporteer het evenement als CSV voor de penningmeester, of als korte samenvatting om in de groepsapp te plakken. Is alles afgerekend, dan kan de telefoon die deelde de gedeelde lijst van de server wissen.
+Leg vast wie betaald heeft, helemaal of voor een deel. Sluit het evenement af zodat er niets meer bij komt, en exporteer de afrekening als CSV voor de penningmeester.
 
 WAT ER WORDT OPGESLAGEN
 
-Zonder delen verlaat er niets de telefoon. Deel je wel, dan staan de namen en de turfjes op een server in Ierland, binnen de EU, en alleen telefoons met de code komen erbij. Geen advertenties, geen trackers, geen account.
+Zonder delen verlaat er niets de telefoon. Deel je een lijst, dan staan de namen en de turfjes op een server in Ierland, binnen de EU, en alleen telefoons met de code komen erbij. Geen account, geen advertenties, geen trackers.
+
+Kleine verbeteringen komen automatisch binnen.
 
 streepje is gemaakt voor Scouting Jan Willem Friso.
 ```
