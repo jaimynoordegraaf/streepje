@@ -17,8 +17,8 @@ choice, not ours. Changing it orphans the app on Play.
 
 # Every change works on Android and iOS
 
-streepje ships to Google Play and to TestFlight, and the main test device is an
-iPhone. A change is not done until it works on both platforms. Testing on one has
+streepje ships to Google Play and to TestFlight, and Jaimy tests on both an iPhone and
+an Android phone. A change is not done until it works on both platforms. Testing on one has
 already hidden a failure on the other once: a PIN dialog opened from inside an
 `Alert` button can fail to appear on iOS, and Android never shows the problem.
 
@@ -38,7 +38,8 @@ Before calling a change done:
   for every permission it asks for.
 - **Respect both safe areas:** the Android navigation bar (edge-to-edge is on) and the
   iPhone notch and home indicator. Bottom bars use `useBottomInset`.
-- **Test on the iPhone** (Expo Go; `npx expo start --tunnel --go` when away from the
-  PC's network) and say plainly what could not be tested on an Android device.
+- **Test on both phones:** the iPhone and the Android phone, each in Expo Go. When
+  away from the PC's network, `npx expo start --tunnel --go` serves both at once,
+  which also allows testing sync between the two platforms on one shared list.
 - **Release both:** the Android bundle from `scripts/build-android-local.mjs`, and an
   EAS iOS build submitted to TestFlight.
