@@ -118,8 +118,12 @@ export type SessionMember = {
 export type ShareInfo = {
   /** Short code shown beneath the QR, so someone can join by typing instead. */
   joinCode: string;
-  /** The host created the event; guests joined it. */
-  role: 'host' | 'guest';
+  /**
+   * Whether this phone is an admin of the shared list. The server's list of
+   * admins is the truth; this is the last answer it gave, kept so the right
+   * buttons still show while the phone is offline.
+   */
+  role: 'admin' | 'member';
   /** Last moment this device successfully reached the server. */
   lastSyncedAt: number | null;
 };

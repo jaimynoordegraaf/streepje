@@ -65,9 +65,10 @@ export default function JoinScreen() {
         entries: remote.entries,
         unsyncedEntryIds: [],
         closed: remote.closed,
-        share: { joinCode: code, role: 'guest', lastSyncedAt: Date.now() },
-        // Guests never correct, so they hold no PIN. The host's PIN stays on
-        // the host's phone and is not part of what a session syncs.
+        share: { joinCode: code, role: 'member', lastSyncedAt: Date.now() },
+        // A phone that joins starts as a member, with no PIN. If an admin makes
+        // it an admin, it chooses its own PIN the first time it corrects. A PIN
+        // never leaves the phone it was set on.
         correctionPin: null,
       };
 

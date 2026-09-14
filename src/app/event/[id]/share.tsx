@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { Text } from '@/components/text';
@@ -8,10 +8,17 @@ import { PromptModal } from '@/components/modals';
 import { PinModal } from '@/components/pin-modal';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { describeError } from '@/lib/errors';
-import { correctionsUnlocked, isHostDevice } from '@/lib/pin';
+import { correctionsUnlocked, isAdminDevice, unlockCorrections } from '@/lib/pin';
 import { newJoinCode, useEvent, useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
-import { deleteSharedSession, hostSession, setMemberName } from '@/lib/sync';
+import {
+  addAdmin,
+  deleteSharedSession,
+  hostSession,
+  removeAdmin,
+  setMemberName,
+} from '@/lib/sync';
+import type { SessionMember } from '@/lib/types';
 import { useEventSync, useSessionMembers } from '@/lib/use-sync';
 import { formatDateTime } from '@/lib/export';
 import { radius, space, useTheme } from '@/theme';
@@ -29,10 +36,13 @@ export default function ShareScreen() {
   const setDeviceName = useStore((state) => state.setDeviceName);
   const bottomInset = useBottomInset();
   const { status, pending, detailsPending, retry } = useEventSync(event);
-  const { members, meId } = useSessionMembers(event);
+  const { members, admins, meId, reload } = useSessionMembers(event);
   const [busy, setBusy] = useState(false);
   const [naming, setNaming] = useState(false);
   const [wipeAsk, setWipeAsk] = useState<'verify' | 'set' | null>(null);
+  // A change to who is an admin, waiting on this phone's PIN.
+  const [adminChange, setAdminChange] = useState<{ userId: string; make: boolean } | null>(null);
+  const [adminAsk, setAdminAsk] = useState<'verify' | 'set' | null>(null);
 
   if (!event) {
     return (
@@ -48,7 +58,7 @@ export default function ShareScreen() {
     try {
       // May differ from the code we proposed, if the event was already online.
       const joinCode = await hostSession(event, newJoinCode());
-      setShare(id, { joinCode, role: 'host', lastSyncedAt: Date.now() });
+      setShare(id, { joinCode, role: 'admin', lastSyncedAt: Date.now() });
       setDeviceName(hostName);
       // Without this the host would be the one phone missing from its own list.
       await setMemberName(id, hostName).catch(() => {});
@@ -114,6 +124,70 @@ export default function ShareScreen() {
         },
       ]
     );
+
+  /** The database refuses in English; say it in the language of the app. */
+  const adminErrorText = (error: unknown) => {
+    const message = describeError(error);
+    if (message.includes('at least one admin')) {
+      return 'Een lijst houdt altijd minstens één beheerder.';
+    }
+    if (message.includes('has not joined')) {
+      return 'Die telefoon doet niet meer mee aan deze lijst.';
+    }
+    if (message.includes('Only an admin')) {
+      return 'Alleen een beheerder kan dit. Misschien is deze telefoon net geen beheerder meer.';
+    }
+    return message;
+  };
+
+  const doAdminChange = async (change: { userId: string; make: boolean }) => {
+    setBusy(true);
+    try {
+      if (change.make) await addAdmin(id, change.userId);
+      else await removeAdmin(id, change.userId);
+    } catch (error) {
+      Alert.alert('Beheerders wijzigen mislukt', adminErrorText(error));
+    } finally {
+      setBusy(false);
+      // Realtime normally brings the change in, but not on a flaky connection.
+      reload();
+    }
+  };
+
+  /**
+   * Who may correct the list is guarded like a correction itself: an admin
+   * phone and its PIN. Without the PIN, anyone handed an admin phone for a
+   * moment could make their own phone an admin and keep that power.
+   */
+  const confirmAdminChange = (member: SessionMember, make: boolean) => {
+    const self = member.userId === meId;
+    const name = self ? 'Deze telefoon' : (member.name ?? 'Naamloze telefoon');
+
+    Alert.alert(
+      make ? `${name} beheerder maken?` : `${name} geen beheerder meer?`,
+      make
+        ? 'Die telefoon kan daarna turfjes en mensen weghalen, betalingen vastleggen, het menu en de prijzen aanpassen, de lijst verwijderen en zelf beheerders aanwijzen. Hij kiest daarvoor zijn eigen correctiecode.'
+        : self
+          ? 'Deze telefoon kan daarna niets meer corrigeren. Alleen een andere beheerder kan dat terugdraaien.'
+          : 'Die telefoon kan daarna alleen nog turven.',
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        {
+          text: make ? 'Beheerder maken' : 'Intrekken',
+          style: make ? 'default' : 'destructive',
+          onPress: () => {
+            const change = { userId: member.userId, make };
+            if (correctionsUnlocked(id)) {
+              doAdminChange(change);
+              return;
+            }
+            setAdminChange(change);
+            setAdminAsk(event.correctionPin ? 'verify' : 'set');
+          },
+        },
+      ]
+    );
+  };
 
   const statusLabel =
     status === 'live'
@@ -198,27 +272,61 @@ export default function ShareScreen() {
 
             <View style={{ gap: space.sm }}>
               <SectionTitle>Telefoons ({members.length})</SectionTitle>
-              <Card style={{ gap: space.sm }}>
+              <Card style={{ gap: space.md }}>
                 {members.length === 0 ? (
                   <Text style={{ color: theme.textDim, fontSize: 14 }}>
                     Nog niemand opgehaald.
                   </Text>
                 ) : (
-                  members.map((member) => (
-                    <View
-                      key={member.userId}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                      <Text style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '600' }}>
-                        {member.name ?? 'Naamloos'}
-                        {member.userId === meId ? ' (deze telefoon)' : ''}
-                      </Text>
-                      <Text style={{ color: theme.textDim, fontSize: 12 }}>
-                        {formatDateTime(member.joinedAt).slice(11)}
-                      </Text>
-                    </View>
-                  ))
+                  members.map((member) => {
+                    const memberIsAdmin = admins.includes(member.userId);
+                    // The last admin cannot be removed, so there is nothing to offer.
+                    const lastAdmin = memberIsAdmin && admins.length === 1;
+                    return (
+                      <View
+                        key={member.userId}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: theme.text, fontSize: 15, fontWeight: '600' }}>
+                            {member.name ?? 'Naamloos'}
+                            {member.userId === meId ? ' (deze telefoon)' : ''}
+                          </Text>
+                          <Text
+                            style={{
+                              color: memberIsAdmin ? theme.good : theme.textDim,
+                              fontSize: 12,
+                              fontWeight: memberIsAdmin ? '700' : '400',
+                            }}>
+                            {memberIsAdmin ? 'Beheerder' : 'Turft mee'} ·{' '}
+                            {formatDateTime(member.joinedAt).slice(11)}
+                          </Text>
+                        </View>
+                        {isAdminDevice(event) && !lastAdmin ? (
+                          <Pressable
+                            onPress={() => confirmAdminChange(member, !memberIsAdmin)}
+                            disabled={busy}
+                            hitSlop={8}>
+                            <Text
+                              style={{
+                                color: memberIsAdmin ? theme.danger : theme.link,
+                                fontWeight: '600',
+                              }}>
+                              {memberIsAdmin ? 'Intrekken' : 'Maak beheerder'}
+                            </Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    );
+                  })
                 )}
               </Card>
+              {isAdminDevice(event) && admins.length === 1 ? (
+                <Text style={{ color: theme.danger, fontSize: 13, lineHeight: 18 }}>
+                  Er is maar één beheertelefoon. Raakt die kwijt of wordt de app opnieuw
+                  geïnstalleerd, dan kan niemand deze lijst nog corrigeren. Maak een tweede
+                  telefoon beheerder.
+                </Text>
+              ) : null}
             </View>
 
             <View style={{ gap: space.sm }}>
@@ -227,7 +335,7 @@ export default function ShareScreen() {
                 variant="danger"
                 onPress={stopSharing}
               />
-              {isHostDevice(event) ? (
+              {isAdminDevice(event) ? (
                 <>
                   <Button
                     title={busy ? 'Bezig…' : 'Gedeelde lijst verwijderen'}
@@ -272,6 +380,36 @@ export default function ShareScreen() {
         onSubmit={(value) => {
           setNaming(false);
           startSharing(value);
+        }}
+      />
+
+      <PinModal
+        visible={adminAsk !== null}
+        mode={adminAsk === 'set' ? 'set' : 'verify'}
+        eventId={id}
+        record={event.correctionPin}
+        title="Beheerders wijzigen"
+        explanation={
+          adminAsk === 'set'
+            ? 'Deze telefoon heeft nog geen correctiecode. Kies er een; die is vanaf nu nodig om beheerders te wijzigen en om te corrigeren.'
+            : 'Voer de correctiecode van deze telefoon in.'
+        }
+        onCancel={() => {
+          setAdminAsk(null);
+          setAdminChange(null);
+        }}
+        onVerified={() => {
+          unlockCorrections(id);
+          setAdminAsk(null);
+          if (adminChange) doAdminChange(adminChange);
+          setAdminChange(null);
+        }}
+        onSet={(record) => {
+          setCorrectionPin(id, record);
+          unlockCorrections(id);
+          setAdminAsk(null);
+          if (adminChange) doAdminChange(adminChange);
+          setAdminChange(null);
         }}
       />
 

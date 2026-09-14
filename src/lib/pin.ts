@@ -6,15 +6,16 @@
  * someone's tab and is exactly what a dishonest or careless tap would do.
  *
  * Two things must both hold before a turf can be removed:
- *   1. you are on the phone that owns the event (see `isHostDevice`), and
- *   2. you know the event's correction PIN.
+ *   1. you are on an admin phone of the list (see `isAdminDevice`), and
+ *   2. you know that phone's correction PIN.
  *
  * The PIN is never stored as typed. It is salted and hashed, so reading the
  * phone's stored data does not hand someone the code. It also never leaves the
- * device: a shared event syncs orders and people, not the PIN.
+ * device: a shared event syncs orders and people, not the PIN, so every admin
+ * phone has its own.
  *
  * Be clear about what this does and does not do. It stops casual tampering and
- * accidental taps. It does not stop whoever holds the host phone and knows the
+ * accidental taps. It does not stop whoever holds an admin phone and knows its
  * PIN -- that person is trusted by definition, which is why every correction is
  * also recorded and shown (see the totals screen and the CSV export).
  */
@@ -56,27 +57,31 @@ export function isValidPinFormat(pin: string): boolean {
 }
 
 /**
- * Is this the phone that owns the event?
+ * Is this phone an admin of the list?
  *
- * An event that was never shared lives only here, so this phone owns it. A
- * shared one is owned by whoever created it; phones that joined are guests.
+ * An event that was never shared lives only here, so this phone is its admin.
+ * A shared list can have several admin phones. The server decides which, and
+ * `share.role` keeps its last answer so this still works offline. The server
+ * enforces the same rule itself, so a stale answer here can show or hide a
+ * button but can never grant anything.
  */
-export function isHostDevice(event: AppEvent): boolean {
-  return event.share === null || event.share.role === 'host';
+export function isAdminDevice(event: AppEvent): boolean {
+  return event.share === null || event.share.role === 'admin';
 }
 
 export type CorrectionBlock =
   | { allowed: true }
-  | { allowed: false; reason: 'guest' | 'no-pin' };
+  | { allowed: false; reason: 'not-admin' | 'no-pin' };
 
 /**
  * Why a correction cannot be made right now, if it cannot.
  *
- * `no-pin` is not a refusal so much as a prompt: the host has not chosen a PIN
- * yet, and is asked to set one at that moment rather than being sent away.
+ * `no-pin` is not a refusal so much as a prompt: this admin phone has not
+ * chosen a PIN yet, and is asked to set one at that moment rather than being
+ * sent away. Every admin phone has its own.
  */
 export function correctionBlock(event: AppEvent): CorrectionBlock {
-  if (!isHostDevice(event)) return { allowed: false, reason: 'guest' };
+  if (!isAdminDevice(event)) return { allowed: false, reason: 'not-admin' };
   if (!event.correctionPin) return { allowed: false, reason: 'no-pin' };
   return { allowed: true };
 }

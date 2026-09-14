@@ -22,12 +22,15 @@ export function MenuEditor({
   onRemove,
   /** Optional extra warning shown before deleting, e.g. "3 already logged". */
   removeWarning,
+  /** Show the menu without the controls to change it. */
+  readOnly = false,
 }: {
   items: MenuItem[];
   onAdd: (draft: Omit<MenuItem, 'id'>) => void;
   onUpdate: (itemId: string, patch: Partial<Omit<MenuItem, 'id'>>) => void;
   onRemove: (itemId: string) => void;
   removeWarning?: (item: MenuItem) => string | null;
+  readOnly?: boolean;
 }) {
   const theme = useTheme();
   const [editing, setEditing] = useState<MenuItem | null>(null);
@@ -64,17 +67,21 @@ export function MenuEditor({
                 </Text>
               </View>
 
-              <Pressable
-                onPress={() => {
-                  setEditing(item);
-                  setFormOpen(true);
-                }}
-                hitSlop={8}>
-                <Text style={{ color: theme.link, fontWeight: '600' }}>Bewerken</Text>
-              </Pressable>
-              <Pressable onPress={() => confirmRemove(item)} hitSlop={8}>
-                <Text style={{ color: theme.danger, fontWeight: '600' }}>Verwijderen</Text>
-              </Pressable>
+              {readOnly ? null : (
+                <>
+                  <Pressable
+                    onPress={() => {
+                      setEditing(item);
+                      setFormOpen(true);
+                    }}
+                    hitSlop={8}>
+                    <Text style={{ color: theme.link, fontWeight: '600' }}>Bewerken</Text>
+                  </Pressable>
+                  <Pressable onPress={() => confirmRemove(item)} hitSlop={8}>
+                    <Text style={{ color: theme.danger, fontWeight: '600' }}>Verwijderen</Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           </Card>
         ))}
@@ -91,14 +98,16 @@ export function MenuEditor({
       {group('Drankjes', 'drink')}
       {group('Eten', 'food')}
 
-      <Button
-        title="Item toevoegen"
-        variant="secondary"
-        onPress={() => {
-          setEditing(null);
-          setFormOpen(true);
-        }}
-      />
+      {readOnly ? null : (
+        <Button
+          title="Item toevoegen"
+          variant="secondary"
+          onPress={() => {
+            setEditing(null);
+            setFormOpen(true);
+          }}
+        />
+      )}
 
       <ItemFormModal
         visible={formOpen}

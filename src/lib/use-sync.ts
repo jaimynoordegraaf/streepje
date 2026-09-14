@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from './store';
 import { ensureSignedIn, isSyncConfigured } from './supabase';
 import {
+  fetchAdmins,
   fetchMembers,
   fetchSession,
   pushDetails,
@@ -34,6 +35,7 @@ export function useEventSync(event: AppEvent | undefined) {
   const mergeRemoteDetails = useStore((state) => state.mergeRemoteDetails);
   const markEntriesSynced = useStore((state) => state.markEntriesSynced);
   const noteSynced = useStore((state) => state.noteSynced);
+  const setShareRole = useStore((state) => state.setShareRole);
 
   const [status, setStatus] = useState<SyncStatus>('off');
   const [attempt, setAttempt] = useState(0);
@@ -85,6 +87,17 @@ export function useEventSync(event: AppEvent | undefined) {
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
 
+    /** Ask the server whether this phone is an admin, and remember the answer. */
+    const refreshRole = () => {
+      Promise.all([fetchAdmins(eventId), ensureSignedIn()])
+        .then(([admins, me]) => {
+          if (!cancelled) setShareRole(eventId, admins.includes(me) ? 'admin' : 'member');
+        })
+        .catch(() => {
+          // Offline: the last answer stands until the connection returns.
+        });
+    };
+
     const start = async () => {
       setStatus('connecting');
       try {
@@ -96,9 +109,12 @@ export function useEventSync(event: AppEvent | undefined) {
         if (!localIsAhead()) mergeRemoteDetails(eventId, remote);
         mergeRemoteEntries(eventId, remote.entries);
         noteSynced(eventId);
+        refreshRole();
 
         unsubscribe = subscribeToSession(eventId, {
           onEntry: (entry) => mergeRemoteEntries(eventId, [entry]),
+          // Someone may have made this phone an admin, or stopped it being one.
+          onMembersChanged: refreshRole,
           onDetailsChanged: () => {
             fetchSession(eventId)
               .then((fresh) => {
@@ -123,7 +139,7 @@ export function useEventSync(event: AppEvent | undefined) {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [shared, eventId, attempt, mergeRemoteDetails, mergeRemoteEntries, noteSynced]);
+  }, [shared, eventId, attempt, mergeRemoteDetails, mergeRemoteEntries, noteSynced, setShareRole]);
 
   // Drain the queue of orders logged on this device.
   useEffect(() => {
@@ -198,11 +214,18 @@ export function useEventSync(event: AppEvent | undefined) {
  */
 export function useSessionMembers(event: AppEvent | undefined): {
   members: SessionMember[];
+  /** User ids of the admin phones. */
+  admins: string[];
   /** This phone's own id, so the list can point out which row is you. */
   meId: string | null;
+  /** Fetch again now, e.g. straight after changing who is an admin. */
+  reload: () => void;
 } {
   const [members, setMembers] = useState<SessionMember[]>([]);
+  const [admins, setAdmins] = useState<string[]>([]);
   const [meId, setMeId] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const reload = useCallback(() => setAttempt((value) => value + 1), []);
 
   const eventId = event?.id;
   const shared = Boolean(event?.share) && isSyncConfigured;
@@ -210,14 +233,17 @@ export function useSessionMembers(event: AppEvent | undefined): {
   useEffect(() => {
     if (!shared || !eventId) {
       setMembers([]);
+      setAdmins([]);
       return;
     }
 
     let cancelled = false;
     const load = () => {
-      fetchMembers(eventId)
-        .then((next) => {
-          if (!cancelled) setMembers(next);
+      Promise.all([fetchMembers(eventId), fetchAdmins(eventId)])
+        .then(([nextMembers, nextAdmins]) => {
+          if (cancelled) return;
+          setMembers(nextMembers);
+          setAdmins(nextAdmins);
         })
         .catch(() => {
           // Offline is not an error worth shouting about here; the list simply
@@ -237,7 +263,7 @@ export function useSessionMembers(event: AppEvent | undefined): {
       cancelled = true;
       unsubscribe();
     };
-  }, [shared, eventId]);
+  }, [shared, eventId, attempt]);
 
-  return { members, meId };
+  return { members, admins, meId, reload };
 }

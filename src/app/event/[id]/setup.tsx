@@ -11,7 +11,7 @@ import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '
 import {
   correctionBlock,
   correctionsUnlocked,
-  isHostDevice,
+  isAdminDevice,
   unlockCorrections,
 } from '@/lib/pin';
 import { useEvent, useStore } from '@/lib/store';
@@ -65,17 +65,17 @@ export default function SetupScreen() {
 
   /**
    * Removing someone takes their turfs out of the total, so it is guarded
-   * exactly as removing a single turf is: the host phone, and the PIN.
+   * exactly as removing a single turf is: an admin phone, and the PIN.
    * Without this it was a way round the PIN entirely -- delete the person and
    * their turfs went with them, quietly.
    */
   const confirmRemovePerson = (person: Person) => {
     const block = correctionBlock(event);
 
-    if (!block.allowed && block.reason === 'guest') {
+    if (!block.allowed && block.reason === 'not-admin') {
       Alert.alert(
-        'Alleen op de hoofdtelefoon',
-        'Iemand verwijderen kan alleen op de telefoon die dit evenement heeft aangemaakt.'
+        'Alleen op een beheertelefoon',
+        'Iemand verwijderen kan alleen op een telefoon die beheerder is van deze lijst. Een beheerder kan dat onder Delen instellen.'
       );
       return;
     }
@@ -108,15 +108,15 @@ export default function SetupScreen() {
 
   /**
    * Deleting the event is the last way to make an evening's takings vanish, so
-   * on the phone that owns it the PIN is required, like every other way of
-   * removing turfs.
+   * on an admin phone the PIN is required, like every other way of removing
+   * turfs.
    *
-   * On a phone that joined, deleting only drops this phone's copy: the shared
+   * On a member's phone, deleting only drops this phone's copy: the shared
    * list and everyone else's still stand. That is leaving, not destroying, so
-   * it is not blocked -- and a guest has no reason to know the host's PIN.
+   * it is not blocked -- and a member has no PIN to give.
    */
   const confirmDeleteEvent = () => {
-    const guest = !isHostDevice(event);
+    const guest = !isAdminDevice(event);
 
     Alert.alert(
       `${event.name} verwijderen?`,
@@ -201,7 +201,7 @@ export default function SetupScreen() {
                         {person.removedBy ? ` · ${person.removedBy}` : ''}
                       </Text>
                     </View>
-                    {isHostDevice(event) ? (
+                    {isAdminDevice(event) ? (
                       <Pressable onPress={() => restorePerson(id, person.id)} hitSlop={8}>
                         <Text style={{ color: theme.link, fontWeight: '600' }}>Terugzetten</Text>
                       </Pressable>
@@ -233,17 +233,21 @@ export default function SetupScreen() {
         <View style={{ gap: space.sm }}>
           <SectionTitle>Menu voor dit evenement</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, marginBottom: space.xs }}>
-            Prices here belong to this event only. Changing them will not affect other events.
+            {isAdminDevice(event)
+              ? 'Prijzen hier gelden alleen voor dit evenement. Een nieuwe prijs geldt voor wat je vanaf nu turft; wat al geturfd is houdt zijn prijs.'
+              : 'Alleen een beheertelefoon kan het menu en de prijzen aanpassen.'}
           </Text>
           <MenuEditor
             items={event.menu}
+            readOnly={!isAdminDevice(event)}
             onAdd={(draft) => addItem(id, draft)}
             onUpdate={(itemId, patch) => updateItem(id, itemId, patch)}
             onRemove={(itemId) => removeItem(id, itemId)}
             removeWarning={(item) => {
               const count = loggedCount(item.id);
+              // Removing only hides the item: turfs already made keep counting.
               return count > 0
-                ? `${count} already logged for this item will be removed as well.`
+                ? `${count} keer geturfd. Die turfjes blijven meetellen; het item verdwijnt alleen van het menu.`
                 : null;
             }}
           />
@@ -252,12 +256,12 @@ export default function SetupScreen() {
         <View style={{ gap: space.sm }}>
           <SectionTitle>Correctiecode</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-            {isHostDevice(event)
-              ? 'Zonder deze code kan niemand een turfje weghalen. Turven zelf blijft gewoon één tik. De code staat alleen op deze telefoon en gaat niet mee als je het evenement deelt.'
-              : 'Turfjes weghalen kan alleen op de telefoon die dit evenement heeft aangemaakt. Op deze telefoon kun je wel turven, maar niets weghalen.'}
+            {isAdminDevice(event)
+              ? 'Zonder deze code kan niemand op deze telefoon een turfje weghalen. Turven zelf blijft gewoon één tik. De code staat alleen op deze telefoon: elke beheertelefoon heeft zijn eigen.'
+              : 'Turfjes weghalen kan alleen op een beheertelefoon. Op deze telefoon kun je wel turven, maar niets weghalen. Een beheerder kan deze telefoon beheerder maken onder Delen.'}
           </Text>
 
-          {isHostDevice(event) ? (
+          {isAdminDevice(event) ? (
             <Card style={{ gap: space.md }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '600' }}>

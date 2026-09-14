@@ -131,6 +131,8 @@ type StoreState = {
 
   setDeviceName: (name: string) => void;
   setShare: (eventId: string, share: ShareInfo | null) => void;
+  /** Remember what the server last said about this phone being an admin. */
+  setShareRole: (eventId: string, role: ShareInfo['role']) => void;
   /** Set or replace the PIN that guards removing a turf. */
   setCorrectionPin: (eventId: string, pin: PinRecord | null) => void;
   /** Take an event that exists on the server and put it on this device. */
@@ -390,6 +392,17 @@ export const useStore = create<StoreState>()(
       setShare: (eventId, share) =>
         set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, share })) }),
 
+      setShareRole: (eventId, role) => {
+        const event = get().events.find((candidate) => candidate.id === eventId);
+        // Runs on every sync and is almost always unchanged; skip the write then.
+        if (!event?.share || event.share.role === role) return;
+        set({
+          events: mapEvent(get().events, eventId, (current) =>
+            current.share ? { ...current, share: { ...current.share, role } } : current
+          ),
+        });
+      },
+
       setCorrectionPin: (eventId, correctionPin) =>
         set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, correctionPin })) }),
 
@@ -403,12 +416,29 @@ export const useStore = create<StoreState>()(
       mergeRemoteEntries: (eventId, incoming) =>
         set({
           events: mapEvent(get().events, eventId, (event) => {
-            const known = new Set(event.entries.map((entry) => entry.id));
+            // The server charges each turf at its own menu price, so a turf
+            // this phone already has can come back priced differently: sent
+            // while offline across a price change, or at a price the menu does
+            // not have. The server's price is the one that counts, and every
+            // phone should show it.
+            const serverPrice = new Map<string, number>();
+            for (const entry of incoming) {
+              if (entry.priceCents !== null) serverPrice.set(entry.id, entry.priceCents);
+            }
+            let repriced = false;
+            const entries = event.entries.map((entry) => {
+              const price = serverPrice.get(entry.id);
+              if (price === undefined || price === entry.priceCents) return entry;
+              repriced = true;
+              return { ...entry, priceCents: price };
+            });
+
+            const known = new Set(entries.map((entry) => entry.id));
             const fresh = incoming.filter((entry) => !known.has(entry.id));
-            if (fresh.length === 0) return event;
+            if (fresh.length === 0 && !repriced) return event;
             return {
               ...event,
-              entries: [...event.entries, ...fresh].sort((a, b) => a.createdAt - b.createdAt),
+              entries: [...entries, ...fresh].sort((a, b) => a.createdAt - b.createdAt),
             };
           }),
         }),
@@ -445,7 +475,7 @@ export const useStore = create<StoreState>()(
     {
       name: 'turf-store-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 8,
+      version: 9,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -579,6 +609,27 @@ export const useStore = create<StoreState>()(
               })),
             };
           });
+        }
+
+        if (fromVersion < 9) {
+          // "Host" and "guest" became "admin" and "member" once a list could
+          // have more than one phone allowed to correct it. The host of an
+          // existing list is its first admin on the server too, and the next
+          // sync confirms or corrects this either way.
+          state.events = (state.events ?? []).map((event: any) =>
+            event.share
+              ? {
+                  ...event,
+                  share: {
+                    ...event.share,
+                    role:
+                      event.share.role === 'host' || event.share.role === 'admin'
+                        ? 'admin'
+                        : 'member',
+                  },
+                }
+              : event
+          );
         }
 
         return state;

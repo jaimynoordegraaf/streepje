@@ -10,6 +10,7 @@ import { PromptModal } from '@/components/modals';
 import { exportCsv, formatDateTime, sharePersonRequest, shareSummary } from '@/lib/export';
 import { parsePrice } from '@/lib/money';
 import { formatCents } from '@/lib/money';
+import { isAdminDevice } from '@/lib/pin';
 import { useEvent, useStore } from '@/lib/store';
 import type { Person } from '@/lib/types';
 import {
@@ -216,36 +217,53 @@ export default function TotalsScreen() {
                 </View>
               ) : null}
 
-              <Pressable
-                onPress={() =>
-                  setPersonPayment(id, person.id, settled ? 0 : personTotal)
-                }
-                style={({ pressed }) => ({
-                  marginTop: space.xs,
-                  paddingVertical: 10,
-                  borderRadius: radius.md,
-                  alignItems: 'center',
-                  backgroundColor: settled ? theme.good : theme.chip,
-                  opacity: pressed ? 0.75 : 1,
-                })}>
+              {/* Recording a payment changes what someone owes, so only an admin
+                  phone offers it. The database ignores it from anyone else. */}
+              {isAdminDevice(event) ? (
+                <Pressable
+                  onPress={() =>
+                    setPersonPayment(id, person.id, settled ? 0 : personTotal)
+                  }
+                  style={({ pressed }) => ({
+                    marginTop: space.xs,
+                    paddingVertical: 10,
+                    borderRadius: radius.md,
+                    alignItems: 'center',
+                    backgroundColor: settled ? theme.good : theme.chip,
+                    opacity: pressed ? 0.75 : 1,
+                  })}>
+                  <Text
+                    style={{
+                      color: settled ? theme.onGood : theme.text,
+                      fontWeight: '700',
+                      fontSize: 14,
+                    }}>
+                    {settled ? 'Betaald ✓  (tik om ongedaan te maken)' : 'Markeer als betaald'}
+                  </Text>
+                </Pressable>
+              ) : settled ? (
                 <Text
                   style={{
-                    color: settled ? theme.onGood : theme.text,
+                    marginTop: space.xs,
+                    color: theme.good,
                     fontWeight: '700',
                     fontSize: 14,
+                    textAlign: 'center',
                   }}>
-                  {settled ? 'Betaald ✓  (tik om ongedaan te maken)' : 'Markeer als betaald'}
+                  Betaald ✓
                 </Text>
-              </Pressable>
+              ) : null}
 
               {!settled ? (
                 <View style={{ flexDirection: 'row', gap: space.sm }}>
-                  <Button
-                    title="Deelbetaling"
-                    variant="secondary"
-                    onPress={() => setPayingPerson(person)}
-                    style={{ flex: 1 }}
-                  />
+                  {isAdminDevice(event) ? (
+                    <Button
+                      title="Deelbetaling"
+                      variant="secondary"
+                      onPress={() => setPayingPerson(person)}
+                      style={{ flex: 1 }}
+                    />
+                  ) : null}
                   <Button
                     title="Vraag betaling"
                     variant="secondary"

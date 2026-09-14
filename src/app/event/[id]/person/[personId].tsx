@@ -61,16 +61,16 @@ export default function PersonScreen() {
 
   /**
    * Removing a turf takes money off someone's tab, so it is the one action
-   * that has to be earned: the phone that owns the event, plus the PIN.
-   * Adding stays a single tap.
+   * that has to be earned: an admin phone, plus the PIN. Adding stays a
+   * single tap.
    */
   const requestRemoval = (item: MenuItem) => {
     const block = correctionBlock(event);
 
-    if (!block.allowed && block.reason === 'guest') {
+    if (!block.allowed && block.reason === 'not-admin') {
       Alert.alert(
-        'Alleen op de hoofdtelefoon',
-        'Turfjes weghalen kan alleen op de telefoon die dit evenement heeft aangemaakt. Vraag degene die deelt om de correctie te doen.'
+        'Alleen op een beheertelefoon',
+        'Turfjes weghalen kan alleen op een telefoon die beheerder is van deze lijst. Vraag een beheerder om de correctie te doen.'
       );
       return;
     }

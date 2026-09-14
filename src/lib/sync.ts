@@ -14,6 +14,7 @@
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
+import { isAdminDevice } from './pin';
 import { isSettled } from './totals';
 
 import type { AppEvent, Category, MenuItem, OrderEntry, Person, SessionMember } from './types';
@@ -291,6 +292,40 @@ export async function setMemberName(sessionId: string, name: string): Promise<vo
   if (error) throw error;
 }
 
+/** Which phones are admins of a list, as user ids. */
+export async function fetchAdmins(sessionId: string): Promise<string[]> {
+  const db = client();
+  const { data, error } = await db
+    .from('session_admins')
+    .select('user_id')
+    .eq('session_id', sessionId);
+  if (error) throw error;
+  return (data ?? []).map((row: { user_id: string }) => row.user_id);
+}
+
+/**
+ * Make a phone that has joined into an admin. Only an admin may, and the
+ * database checks that itself, so a visible button is not what grants it.
+ */
+export async function addAdmin(sessionId: string, userId: string): Promise<void> {
+  await ensureSignedIn();
+  const { error } = await client().rpc('add_admin', {
+    p_session_id: sessionId,
+    p_user_id: userId,
+  });
+  if (error) throw error;
+}
+
+/** Stop a phone being an admin. Refused for the last admin of a list. */
+export async function removeAdmin(sessionId: string, userId: string): Promise<void> {
+  await ensureSignedIn();
+  const { error } = await client().rpc('remove_admin', {
+    p_session_id: sessionId,
+    p_user_id: userId,
+  });
+  if (error) throw error;
+}
+
 /**
  * Send order rows.
  *
@@ -314,6 +349,10 @@ export async function pushEntries(sessionId: string, entries: OrderEntry[]): Pro
 /** Send the parts that are edited rather than appended. */
 export async function pushDetails(event: AppEvent): Promise<void> {
   const db = client();
+  // Only an admin's menu is accepted; the server quietly ignores anyone else's.
+  // Not sending it at all saves the round trip, and keeps a member's stale copy
+  // from ever looking like an attempt to change prices.
+  const sendMenu = isAdminDevice(event);
 
   const results = await Promise.all([
     db.from('sessions').update({ name: event.name, closed: event.closed }).eq('id', event.id),
@@ -322,7 +361,7 @@ export async function pushDetails(event: AppEvent): Promise<void> {
           .from('session_people')
           .upsert(event.people.map((p) => fromPerson(event.id, p, isSettled(event, p))))
       : Promise.resolve({ error: null }),
-    event.menu.length
+    sendMenu && event.menu.length
       ? db.from('session_items').upsert(event.menu.map((i) => fromItem(event.id, i)))
       : Promise.resolve({ error: null }),
   ]);
@@ -386,6 +425,12 @@ export function subscribeToSession(sessionId: string, handlers: Handlers): () =>
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'session_members', filter },
+        announceMembers
+      )
+      // Becoming or ceasing to be an admin is a change to the phone list too.
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'session_admins', filter },
         announceMembers
       )
       .subscribe();
