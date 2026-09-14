@@ -2,7 +2,9 @@
 
 Paste-ready text for Play Console → Store listing. Character limits in brackets.
 Written for 1.0.3: season tab, members and guests, admin phones, closing events, and
-over-the-air updates. Keep it in step with `appstore-nl.md`.
+over-the-air updates. Keep the description in step with `listing-ios-nl.md`.
+
+Privacy policy URL in Play Console: `https://scoutingjwf.nl/streepje/privacy/`.
 
 ## App name [30]
 
