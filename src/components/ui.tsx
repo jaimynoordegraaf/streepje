@@ -29,10 +29,21 @@ import { font, radius, space, useTheme } from '@/theme';
  */
 const contentMaxWidth = 640;
 
-export function Screen({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
+export function Screen({
+  children,
+  header,
+  footer,
+}: {
+  children: ReactNode;
+  /** A TopBar: painted edge to edge, above the content column. */
+  header?: ReactNode;
+  footer?: ReactNode;
+}) {
   const theme = useTheme();
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
+      {/* Outside the column, for the same reason as the footer below. */}
+      {header}
       <View style={{ flex: 1, width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center' }}>
         {children}
       </View>
@@ -41,6 +52,38 @@ export function Screen({ children, footer }: { children: ReactNode; footer?: Rea
           looks like a rendering fault rather than a choice. It centres its own
           buttons instead. */}
       {footer}
+    </View>
+  );
+}
+
+/**
+ * A fixed bar at the top of a screen, under the navigation header.
+ *
+ * The mirror of BottomBar, and there for the same reason: pass it to Screen's
+ * `header`, not as a child. Its background and bottom border run the full
+ * width of the glass, while what it holds stays in the content column. As a
+ * child of Screen, the person screen's running total sat inside that column,
+ * so on an iPad its bar stopped short of both edges.
+ */
+export function TopBar({ children }: { children: ReactNode }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        backgroundColor: theme.card,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.border,
+      }}>
+      <View
+        style={{
+          width: '100%',
+          maxWidth: contentMaxWidth,
+          alignSelf: 'center',
+          paddingHorizontal: space.lg,
+          paddingVertical: space.md,
+        }}>
+        {children}
+      </View>
     </View>
   );
 }

@@ -39,7 +39,7 @@ export function MenuEditor({
   const confirmRemove = (item: MenuItem) => {
     const warning = removeWarning?.(item);
     Alert.alert(
-      `Remove ${item.name}?`,
+      `${item.name} verwijderen?`,
       warning ?? undefined,
       [
         { text: 'Annuleren', style: 'cancel' },

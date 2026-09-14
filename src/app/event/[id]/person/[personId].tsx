@@ -5,7 +5,15 @@ import { Alert, SectionList, View } from 'react-native';
 import { CheckIcon, CrossIcon } from '@/components/icons';
 import { PinModal } from '@/components/pin-modal';
 import { Text } from '@/components/text';
-import { Card, EmptyState, Screen, SectionTitle, StepButton, useBottomInset } from '@/components/ui';
+import {
+  Card,
+  EmptyState,
+  Screen,
+  SectionTitle,
+  StepButton,
+  TopBar,
+  useBottomInset,
+} from '@/components/ui';
 import { formatCents } from '@/lib/money';
 import {
   correctionBlock,
@@ -132,38 +140,38 @@ export default function PersonScreen() {
   };
 
   return (
-    <Screen>
-      <Stack.Screen options={{ title: person.name }} />
-
-      {/* Running total, always visible while tapping. */}
-      <View
-        style={{
-          paddingHorizontal: space.lg,
-          paddingVertical: space.md,
-          backgroundColor: theme.card,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.border,
-          flexDirection: 'row',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          gap: space.sm,
-        }}>
-        {/* Shrinks first, so a larger phone text size cannot push the amount
-            into it. The amount itself must never wrap. */}
-        <View style={{ gap: 2, flexShrink: 1 }}>
-          <Text style={{ color: theme.textDim, fontSize: 14 }}>
-            {personItemCount(event, person.id)} consumpties
-          </Text>
-          {unlocked ? (
-            <Text style={{ color: theme.danger, fontSize: 12, fontWeight: '600' }}>
-              Correcties ontgrendeld
+    <Screen
+      header={
+        // Running total, always visible while tapping. A TopBar rather than a
+        // child of Screen, so its background reaches both edges of an iPad
+        // while the count and amount stay above the list they describe.
+        <TopBar>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              gap: space.sm,
+            }}>
+            {/* Shrinks first, so a larger phone text size cannot push the amount
+                into it. The amount itself must never wrap. */}
+            <View style={{ gap: 2, flexShrink: 1 }}>
+              <Text style={{ color: theme.textDim, fontSize: 14 }}>
+                {personItemCount(event, person.id)} consumpties
+              </Text>
+              {unlocked ? (
+                <Text style={{ color: theme.danger, fontSize: 12, fontWeight: '600' }}>
+                  Correcties ontgrendeld
+                </Text>
+              ) : null}
+            </View>
+            <Text numberOfLines={1} style={{ color: theme.text, fontSize: 24, fontWeight: '800' }}>
+              {formatCents(personTotalCents(event, person.id))}
             </Text>
-          ) : null}
-        </View>
-        <Text numberOfLines={1} style={{ color: theme.text, fontSize: 24, fontWeight: '800' }}>
-          {formatCents(personTotalCents(event, person.id))}
-        </Text>
-      </View>
+          </View>
+        </TopBar>
+      }>
+      <Stack.Screen options={{ title: person.name }} />
 
       <SectionList
         sections={sections}
