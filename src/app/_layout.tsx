@@ -23,9 +23,9 @@ function useHydrated(): boolean {
 /**
  * The back control, in the brand's own chevron.
  *
- * Returns null on the first screen: replacing headerLeft removes the native
- * back button, so without this check the root would show an arrow that has
- * nowhere to go.
+ * Only ever mounted where there is something to go back to -- see the
+ * headerLeft option below -- and it checks again itself, because an arrow that
+ * leads nowhere is worse than no arrow.
  */
 function HeaderBack() {
   const router = useRouter();
@@ -103,7 +103,7 @@ export default function RootLayout() {
       <StatusBar style={dark ? 'light' : 'dark'} />
       <ThemeProvider value={navigationTheme}>
         <Stack
-          screenOptions={{
+          screenOptions={({ navigation }) => ({
             headerStyle: { backgroundColor: theme.card },
             headerTintColor: theme.text,
             // Bold italic, matching the logotype.
@@ -113,8 +113,13 @@ export default function RootLayout() {
               fontSize: typeScale.title,
             },
             contentStyle: { backgroundColor: theme.background },
-            headerLeft: () => <HeaderBack />,
-          }}
+            // A header left item only where there is somewhere to go back to.
+            // Having one that renders nothing is not the same as having none:
+            // from iOS 26 the bar still draws the Liquid Glass capsule meant to
+            // hold it, so the first screen showed an empty pill that could be
+            // tapped and did nothing.
+            headerLeft: navigation.canGoBack() ? () => <HeaderBack /> : undefined,
+          })}
         />
       </ThemeProvider>
     </SafeAreaProvider>
