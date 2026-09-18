@@ -8,6 +8,7 @@ import { MenuEditor } from '@/components/menu-editor';
 import { PromptModal } from '@/components/modals';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { useStore } from '@/lib/store';
+import { setMemberName } from '@/lib/sync';
 import type { SavedPerson } from '@/lib/types';
 import { versionLine } from '@/lib/version';
 import { space, useTheme } from '@/theme';
@@ -22,9 +23,33 @@ export default function SettingsScreen() {
   const addDefaultPerson = useStore((state) => state.addDefaultPerson);
   const renameDefaultPerson = useStore((state) => state.renameDefaultPerson);
   const removeDefaultPerson = useStore((state) => state.removeDefaultPerson);
+  const deviceName = useStore((state) => state.deviceName);
+  const setDeviceName = useStore((state) => state.setDeviceName);
+  const events = useStore((state) => state.events);
   const [addingPerson, setAddingPerson] = useState(false);
   const [renamingPerson, setRenamingPerson] = useState<SavedPerson | null>(null);
+  const [namingDevice, setNamingDevice] = useState(false);
   const bottomInset = useBottomInset();
+
+  /**
+   * The name this phone carries into a shared list.
+   *
+   * Set here, it is already known when you join one, so joining is a scan and
+   * nothing else. Changing it also renames this phone in every list it has
+   * already joined, so the others do not keep seeing the old name. That part is
+   * best effort: a list that cannot be reached right now keeps the old name
+   * until the name is set again.
+   */
+  const renameDevice = (name: string) => {
+    const trimmed = name.trim();
+    if (trimmed === '') return;
+    setDeviceName(trimmed);
+    for (const event of events) {
+      if (event.share) setMemberName(event.id, trimmed).catch(() => {});
+    }
+  };
+
+  const sharedCount = events.filter((event) => event.share).length;
 
   return (
     <Screen>
@@ -89,6 +114,37 @@ export default function SettingsScreen() {
           <Button title="Naam toevoegen" variant="secondary" onPress={() => setAddingPerson(true)} />
         </View>
 
+        <View style={{ gap: space.sm, marginTop: space.md }}>
+          <SectionTitle>Deze telefoon</SectionTitle>
+          <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+            De naam die de andere telefoons zien bij een gedeelde lijst, zodat duidelijk is welke
+            telefoon meetelt. Bijvoorbeeld je eigen naam of &quot;Bar&quot;.
+          </Text>
+          <Card style={{ paddingVertical: space.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+              <Text
+                style={{
+                  flex: 1,
+                  color: deviceName ? theme.text : theme.textDim,
+                  fontSize: 16,
+                  fontWeight: '600',
+                }}>
+                {deviceName ?? 'Nog geen naam'}
+              </Text>
+              <Pressable onPress={() => setNamingDevice(true)} hitSlop={8}>
+                <Text style={{ color: theme.link, fontWeight: '600' }}>
+                  {deviceName ? 'Wijzigen' : 'Instellen'}
+                </Text>
+              </Pressable>
+            </View>
+          </Card>
+          {deviceName && sharedCount > 0 ? (
+            <Text style={{ color: theme.textDim, fontSize: 12 }}>
+              Een wijziging geldt ook voor {sharedCount === 1 ? 'de gedeelde lijst' : `de ${sharedCount} gedeelde lijsten`} waar deze telefoon al aan meedoet.
+            </Text>
+          ) : null}
+        </View>
+
         <View style={{ gap: space.xs, marginTop: space.md }}>
           <SectionTitle>Over je gegevens</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
@@ -113,6 +169,19 @@ export default function SettingsScreen() {
         onSubmit={(name) => {
           addDefaultPerson(name);
           setAddingPerson(false);
+        }}
+      />
+
+      <PromptModal
+        visible={namingDevice}
+        title="Naam van deze telefoon"
+        placeholder="Naam"
+        initialValue={deviceName ?? ''}
+        submitLabel="Opslaan"
+        onCancel={() => setNamingDevice(false)}
+        onSubmit={(name) => {
+          renameDevice(name);
+          setNamingDevice(false);
         }}
       />
 
