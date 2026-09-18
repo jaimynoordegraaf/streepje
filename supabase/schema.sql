@@ -170,6 +170,50 @@ begin
 end;
 $$;
 
+-- Stopping sharing on a phone also takes it out of the list, so the others no
+-- longer see it among the participants. A phone may only remove itself, which
+-- is why there is no delete policy on session_members and this checks who is
+-- asking. The last admin of a list that still has other members cannot leave:
+-- that would strand a list nobody can correct.
+create or replace function public.leave_session(p_session_id text)
+returns void language plpgsql security definer
+set search_path = public as $$
+declare
+  v_other_admins int;
+  v_other_members int;
+begin
+  if auth.uid() is null then
+    raise exception 'Not signed in';
+  end if;
+
+  if not public.is_member(p_session_id) then
+    return;
+  end if;
+
+  if public.is_admin(p_session_id) then
+    perform 1 from public.sessions where id = p_session_id for update;
+
+    select count(*) into v_other_admins
+      from public.session_admins
+     where session_id = p_session_id and user_id <> auth.uid();
+
+    select count(*) into v_other_members
+      from public.session_members
+     where session_id = p_session_id and user_id <> auth.uid();
+
+    if v_other_admins = 0 and v_other_members > 0 then
+      raise exception 'last admin of this session';
+    end if;
+
+    delete from public.session_admins
+     where session_id = p_session_id and user_id = auth.uid();
+  end if;
+
+  delete from public.session_members
+   where session_id = p_session_id and user_id = auth.uid();
+end;
+$$;
+
 create or replace function public.add_admin(p_session_id text, p_user_id uuid)
 returns void language plpgsql security definer
 set search_path = public as $$

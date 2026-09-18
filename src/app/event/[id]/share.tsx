@@ -15,6 +15,7 @@ import {
   addAdmin,
   deleteSharedSession,
   hostSession,
+  leaveSession,
   removeAdmin,
   setMemberName,
 } from '@/lib/sync';
@@ -75,13 +76,44 @@ export default function ShareScreen() {
     }
   };
 
+  /**
+   * Stop sharing here, and leave the list on the server as well, so this phone
+   * disappears from the others' list of participants. What was turfed stays:
+   * those orders belong to the list, not to the phone that logged them.
+   */
+  const doStopSharing = async () => {
+    setBusy(true);
+    try {
+      await leaveSession(id);
+      setShare(id, null);
+    } catch (error) {
+      const message = describeError(error);
+      if (message.includes('last admin')) {
+        Alert.alert(
+          'Nog maar één beheertelefoon',
+          'Deze telefoon is de enige beheerder van deze lijst. Maak eerst een andere telefoon beheerder, anders kan niemand de lijst nog corrigeren.'
+        );
+        return;
+      }
+      // Most likely no connection. Stopping is this phone's own decision, so it
+      // goes ahead; only the others' list stays out of date.
+      setShare(id, null);
+      Alert.alert(
+        'Gestopt met delen',
+        'Deze telefoon deelt niet meer. De server was niet bereikbaar, dus bij de andere telefoons kan deze telefoon nog even in de lijst blijven staan.'
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const stopSharing = () =>
     Alert.alert(
       'Stoppen met delen op deze telefoon?',
-      'Deze telefoon werkt daarna weer op zichzelf. Al verstuurde bestellingen blijven in de gedeelde lijst staan en andere telefoons gaan gewoon door.',
+      'Deze telefoon werkt daarna weer op zichzelf en verdwijnt uit de lijst met telefoons. Al verstuurde bestellingen blijven in de gedeelde lijst staan en andere telefoons gaan gewoon door.',
       [
         { text: 'Annuleren', style: 'cancel' },
-        { text: 'Stoppen', style: 'destructive', onPress: () => setShare(id, null) },
+        { text: 'Stoppen', style: 'destructive', onPress: doStopSharing },
       ]
     );
 

@@ -317,6 +317,21 @@ export async function setMemberName(sessionId: string, name: string): Promise<vo
   if (error) throw error;
 }
 
+/**
+ * Take this phone out of a shared list.
+ *
+ * Stopping sharing used to be a local decision only, which left this phone
+ * among the participants on every other phone. A phone may remove itself and
+ * nothing else; the database checks that. Refused for the last admin of a list
+ * that still has other phones in it, because that would leave a list nobody can
+ * correct.
+ */
+export async function leaveSession(sessionId: string): Promise<void> {
+  await ensureSignedIn();
+  const { error } = await client().rpc('leave_session', { p_session_id: sessionId });
+  if (error) throw error;
+}
+
 /** Which phones are admins of a list, as user ids. */
 export async function fetchAdmins(sessionId: string): Promise<string[]> {
   const db = client();
