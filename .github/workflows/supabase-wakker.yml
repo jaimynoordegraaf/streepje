@@ -1,0 +1,65 @@
+# Houdt het Supabase-project wakker.
+#
+# Supabase pauzeert een project op het gratis plan bij te weinig activiteit over
+# zeven dagen. Een gepauzeerd project verdwijnt zelfs uit DNS, en dan werkt delen
+# en samen turven voor niemand meer -- dat is op 30 september 2026 gebeurd, en
+# het viel pas op toen iemand wilde delen. Deze workflow doet elke dag een echte
+# query, zodat het project actief blijft.
+#
+# Elke dag, niet elke drie dagen: Supabase spreekt van "te weinig activiteit",
+# niet van "helemaal niets". Een verzoek per dag kost niets en laat geen ruimte
+# voor twijfel.
+#
+# Let op: GitHub schakelt geplande workflows uit na 60 dagen zonder activiteit in
+# de repository, met een mail erover. Gebeurt dat, zet hem dan weer aan onder
+# Actions.
+
+name: Supabase wakker houden
+
+on:
+  schedule:
+    # 07:12 UTC. Een oneven tijdstip, omdat geplande taken op hele uren bij
+    # GitHub het drukst zijn en dan later lopen.
+    - cron: '12 7 * * *'
+  # Zodat je hem ook met de hand kunt draaien, bijvoorbeeld na een pauze.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query het project
+        env:
+          URL: ${{ secrets.SUPABASEURL }}
+          KEY: ${{ secrets.SUPABASEKEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${URL}" ] || [ -z "${KEY}" ]; then
+            echo "De secrets SUPABASEURL en SUPABASEKEY ontbreken." >&2
+            echo "Zet ze onder Settings -> Secrets and variables -> Actions." >&2
+            exit 1
+          fi
+
+          # Een echte query op de database, geen health-check: het gaat erom dat
+          # Postgres wordt aangeraakt. De rij-beveiliging laat een onbekende
+          # client niets zien, dus dit levert een lege lijst op. Dat is de
+          # bedoeling -- we willen activiteit, geen gegevens.
+          code=$(curl -s -o /tmp/antwoord.txt -w '%{http_code}' --max-time 60 \
+            -H "apikey: ${KEY}" \
+            "${URL}/rest/v1/sessions?select=id&limit=1")
+
+          echo "HTTP ${code}"
+          echo "Antwoord: $(head -c 200 /tmp/antwoord.txt)"
+
+          if [ "${code}" != "200" ]; then
+            echo "Onverwacht antwoord van Supabase. Staat het project op pauze?" >&2
+            exit 1
+          fi
+
+          {
+            echo "### Supabase"
+            echo ""
+            echo "Query beantwoord met HTTP ${code} op $(date -u '+%Y-%m-%d %H:%M UTC')."
+          } >> "${GITHUB_STEP_SUMMARY}"
