@@ -47,3 +47,6 @@ example
 
 # Local release signing: the upload key, never commit it
 /signing
+
+# Schermafbeeldingen voor de winkels: lokaal gemaakt, niet in de repo.
+store/screenshots/
