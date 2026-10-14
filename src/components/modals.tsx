@@ -212,7 +212,7 @@ export function whenAlertClosed(open: () => void): void {
 }
 
 /** A row of mutually exclusive options, the selected one filled in. */
-function Choice<T extends string>({
+export function Choice<T extends string>({
   options,
   value,
   onChange,

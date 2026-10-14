@@ -368,6 +368,19 @@ export default function SetupScreen() {
         </View>
 
         <View style={{ gap: space.sm }}>
+          <SectionTitle>Logboek</SectionTitle>
+          <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+            Wie wat heeft geturfd, op welke telefoon en hoe laat. Om na te kijken waar een bedrag
+            vandaan komt, of wat er is weggehaald.
+          </Text>
+          <Button
+            title="Logboek bekijken"
+            variant="secondary"
+            onPress={() => router.push({ pathname: '/event/[id]/log', params: { id } })}
+          />
+        </View>
+
+        <View style={{ gap: space.sm }}>
           <SectionTitle>Afronden</SectionTitle>
           {/* A season tab runs for good, so there is nothing to close. */}
           {event.kind === 'event' && isAdminDevice(event) ? (
