@@ -264,17 +264,131 @@ export type RemoteSession = {
   kind: ListKind;
   createdAt: number;
   closed: boolean;
+  /** De groep waar de lijst bij hoort, of null als hij los wordt gedeeld. */
+  groupId: string | null;
   people: Person[];
   menu: MenuItem[];
   entries: OrderEntry[];
 };
+
+// ------------------------------------------------------------- groepen ----
+
+/**
+ * Een groep is de barploeg.
+ *
+ * Telefoons scannen één keer de groepscode en zien daarna elke lijst van de
+ * groep, zonder dat iemand per lijst nog een code hoeft te delen. Lid zijn van
+ * de groep geeft lezen en turven; corrigeren en betalen blijft per lijst aan
+ * de beheertelefoons. De database bewaakt dat, niet deze code.
+ */
+export type RemoteGroup = { id: string; name: string; joinCode: string };
+
+/** Een lijst van de groep, zoals hij op het groepsoverzicht staat. */
+export type GroupSession = {
+  id: string;
+  name: string;
+  kind: ListKind;
+  joinCode: string;
+  createdAt: number;
+};
+
+export async function createGroup(id: string, name: string, joinCode: string): Promise<RemoteGroup> {
+  await ensureSignedIn();
+  const { error } = await client().rpc('create_group', {
+    p_id: id,
+    p_name: name,
+    p_join_code: joinCode,
+  });
+  if (error) throw error;
+  return { id, name, joinCode: joinCode.toUpperCase() };
+}
+
+/** Deelnemen met de groepscode. De enige manier om in een groep te komen. */
+export async function joinGroup(joinCode: string): Promise<RemoteGroup> {
+  await ensureSignedIn();
+  const db = client();
+
+  const { data, error } = await db.rpc('join_group', { p_join_code: joinCode.trim() });
+  if (error) throw error;
+  if (!data) throw new Error('Geen groep met die code.');
+
+  const group = await fetchGroup(data as string);
+  if (!group) throw new Error('De groep is niet te lezen na het deelnemen.');
+  return group;
+}
+
+export async function fetchGroup(groupId: string): Promise<RemoteGroup | null> {
+  const { data, error } = await client()
+    .from('groups')
+    .select('id, name, join_code')
+    .eq('id', groupId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { id: data.id as string, name: data.name as string, joinCode: data.join_code as string };
+}
+
+export async function leaveGroup(groupId: string): Promise<void> {
+  await ensureSignedIn();
+  const { error } = await client().rpc('leave_group', { p_group_id: groupId });
+  if (error) throw error;
+}
+
+/** Alle lijsten van de groep, nieuwste eerst. */
+export async function fetchGroupSessions(groupId: string): Promise<GroupSession[]> {
+  const { data, error } = await client()
+    .from('sessions')
+    .select('id, name, kind, join_code, created_at')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    kind: (row.kind === 'tab' ? 'tab' : 'event') as ListKind,
+    joinCode: row.join_code as string,
+    createdAt: Date.parse(row.created_at as string),
+  }));
+}
+
+/**
+ * Een bestaande gedeelde lijst bij de groep zetten.
+ *
+ * Mag alleen een beheerder van die lijst, alleen als hij nog bij geen groep
+ * hoort, en alleen bij een groep waar die beheerder zelf in zit. De trigger in
+ * de database bewaakt alle drie; lukt het niet, dan blijft group_id gewoon
+ * leeg en zegt deze functie dat.
+ */
+export async function attachToGroup(sessionId: string, groupId: string): Promise<void> {
+  await ensureSignedIn();
+  const db = client();
+
+  const { error } = await db.from('sessions').update({ group_id: groupId }).eq('id', sessionId);
+  if (error) throw error;
+
+  const { data, error: readError } = await db
+    .from('sessions')
+    .select('group_id')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (data?.group_id !== groupId) {
+    throw new Error(
+      'De lijst is niet aan de groep gekoppeld. Dit kan alleen op een beheertelefoon, en alleen zolang de lijst nog bij geen groep hoort.'
+    );
+  }
+}
 
 /** Read the whole shared event. Used when joining, and to catch up after being offline. */
 export async function fetchSession(sessionId: string): Promise<RemoteSession> {
   const db = client();
 
   const [session, people, items, entries] = await Promise.all([
-    db.from('sessions').select('name, kind, closed, created_at').eq('id', sessionId).maybeSingle(),
+    db
+      .from('sessions')
+      .select('name, kind, closed, created_at, group_id')
+      .eq('id', sessionId)
+      .maybeSingle(),
     db.from('session_people').select('*').eq('session_id', sessionId),
     db.from('session_items').select('*').eq('session_id', sessionId),
     db.from('order_entries').select('*').eq('session_id', sessionId),
@@ -291,6 +405,7 @@ export async function fetchSession(sessionId: string): Promise<RemoteSession> {
     kind: session.data.kind === 'tab' ? 'tab' : 'event',
     createdAt: Date.parse(session.data.created_at),
     closed: session.data.closed,
+    groupId: session.data.group_id ?? null,
     people: (people.data ?? []).map(toPerson),
     menu: (items.data ?? []).map(toItem),
     entries: (entries.data ?? []).map(toEntry).sort((a, b) => a.createdAt - b.createdAt),

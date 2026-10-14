@@ -210,6 +210,14 @@ export type AppEvent = {
    * a tab is never closed.
    */
   closed: boolean;
+  /**
+   * De groep waar deze lijst bij hoort, als hij bij een groep hoort.
+   *
+   * Lijsten van de groep verschijnen vanzelf op de telefoons van de barploeg;
+   * een losse gedeelde lijst blijft werken zoals hij deed. Wordt gezet door een
+   * beheerder en staat daarna vast.
+   */
+  groupId?: string | null;
   /** Null while the event lives only on this phone. */
   share: ShareInfo | null;
   /**

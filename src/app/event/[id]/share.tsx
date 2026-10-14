@@ -13,6 +13,7 @@ import { newJoinCode, useEvent, useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
 import {
   addAdmin,
+  attachToGroup,
   deleteSharedSession,
   hostSession,
   leaveSession,
@@ -33,6 +34,8 @@ export default function ShareScreen() {
   const event = useEvent(id);
   const setShare = useStore((state) => state.setShare);
   const dropEntries = useStore((state) => state.dropEntries);
+  const group = useStore((state) => state.group);
+  const setEventGroup = useStore((state) => state.setEventGroup);
   const setCorrectionPin = useStore((state) => state.setCorrectionPin);
   const rememberedName = useStore((state) => state.deviceName);
   const setDeviceName = useStore((state) => state.setDeviceName);
@@ -363,6 +366,49 @@ export default function ShareScreen() {
                 </Text>
               ) : null}
             </View>
+
+            {/* De groep: de barploeg ziet lijsten van de groep vanzelf, zonder
+                dat iemand deze code hoeft te scannen. Koppelen kan één keer en
+                alleen op een beheertelefoon; daarna ligt het vast. */}
+            {group ? (
+              <View style={{ gap: space.sm }}>
+                <SectionTitle>Groep</SectionTitle>
+                {event.groupId ? (
+                  <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+                    {event.groupId === group.id
+                      ? `Deze lijst hoort bij ${group.name}. Iedereen uit die ploeg ziet hem vanzelf.`
+                      : 'Deze lijst hoort bij een andere groep dan die van deze telefoon.'}
+                  </Text>
+                ) : isAdminDevice(event) ? (
+                  <>
+                    <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+                      Zet deze lijst bij {group.name}, dan verschijnt hij vanzelf op de telefoons
+                      van de ploeg. Dit kan één keer en is daarna niet meer te wijzigen.
+                    </Text>
+                    <Button
+                      title={busy ? 'Bezig…' : `Aan ${group.name} toevoegen`}
+                      variant="secondary"
+                      disabled={busy}
+                      onPress={async () => {
+                        setBusy(true);
+                        try {
+                          await attachToGroup(id, group.id);
+                          setEventGroup(id, group.id);
+                        } catch (error) {
+                          Alert.alert('Toevoegen aan de groep mislukt', describeError(error));
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    />
+                  </>
+                ) : (
+                  <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+                    Alleen een beheertelefoon kan deze lijst aan {group.name} toevoegen.
+                  </Text>
+                )}
+              </View>
+            ) : null}
 
             <View style={{ gap: space.sm }}>
               <Button

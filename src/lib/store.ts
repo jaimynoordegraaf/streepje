@@ -108,6 +108,14 @@ type StoreState = {
    * existed, which the persist merge handles by falling back to null.
    */
   deviceName: string | null;
+  /**
+   * De groep waar deze telefoon bij hoort: de barploeg.
+   *
+   * Eén keer scannen is genoeg; daarna verschijnen de lijsten van de groep
+   * vanzelf. Hier staat alleen wat deze telefoon nodig heeft om ze op te
+   * halen -- wie er lid is en wat je mag, weet de database.
+   */
+  group: { id: string; name: string; joinCode: string } | null;
   events: AppEvent[];
   /** The menu that newly created events start from. */
   defaultMenu: MenuItem[];
@@ -179,6 +187,10 @@ type StoreState = {
   // --- used by the sync engine -------------------------------------------
 
   setDeviceName: (name: string) => void;
+  /** De groep van deze telefoon, of null na het verlaten ervan. */
+  setGroup: (group: { id: string; name: string; joinCode: string } | null) => void;
+  /** Onthoud dat een lijst bij een groep hoort. De server beslist dat. */
+  setEventGroup: (eventId: string, groupId: string | null) => void;
   setShare: (eventId: string, share: ShareInfo | null) => void;
   /** Remember what the server last said about this phone being an admin. */
   setShareRole: (eventId: string, role: ShareInfo['role']) => void;
@@ -191,7 +203,14 @@ type StoreState = {
   /** Replace the parts that are edited rather than appended. */
   mergeRemoteDetails: (
     eventId: string,
-    details: { name: string; closed: boolean; people: Person[]; menu: MenuItem[] }
+    details: {
+      name: string;
+      closed: boolean;
+      people: Person[];
+      menu: MenuItem[];
+      /** Alleen gelezen: koppelen aan een groep gebeurt op de server. */
+      groupId?: string | null;
+    }
   ) => void;
   markEntriesSynced: (eventId: string, entryIds: string[]) => void;
   /**
@@ -208,6 +227,7 @@ export const useStore = create<StoreState>()(
     (set, get) => ({
       deviceId: newId(),
       deviceName: null,
+      group: null,
       events: [],
       defaultMenu: withIds(STARTER_MENU),
       defaultPeople: [],
@@ -226,6 +246,7 @@ export const useStore = create<StoreState>()(
           entries: [],
           unsyncedEntryIds: [],
           closed: false,
+          groupId: null,
           share: null,
           correctionPin: null,
         };
@@ -498,6 +519,11 @@ export const useStore = create<StoreState>()(
 
       setDeviceName: (deviceName) => set({ deviceName: deviceName.trim() || null }),
 
+      setGroup: (group) => set({ group }),
+
+      setEventGroup: (eventId, groupId) =>
+        set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, groupId })) }),
+
       setShare: (eventId, share) =>
         set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, share })) }),
 
@@ -558,6 +584,7 @@ export const useStore = create<StoreState>()(
             ...event,
             name: details.name,
             closed: details.closed,
+            groupId: details.groupId ?? event.groupId ?? null,
             people: details.people,
             menu: details.menu,
           })),
