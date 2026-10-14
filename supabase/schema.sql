@@ -3,6 +3,26 @@
 
 -- ---------------------------------------------------------------- tables ---
 
+-- A group is the bar crew. Phones scan its code once and then see every list
+-- that belongs to it, instead of scanning each list separately. Membership of a
+-- group grants reading and turfing, never correcting: that stays with the
+-- admins of each list.
+create table if not exists public.groups (
+  id          text primary key,
+  name        text not null,
+  join_code   text not null unique,
+  created_at  timestamptz not null default now(),
+  created_by  uuid
+);
+
+create table if not exists public.group_members (
+  group_id    text not null references public.groups(id) on delete cascade,
+  user_id     uuid not null,
+  name        text,
+  joined_at   timestamptz not null default now(),
+  primary key (group_id, user_id)
+);
+
 create table if not exists public.sessions (
   id          text primary key,
   join_code   text not null unique,
@@ -10,9 +30,14 @@ create table if not exists public.sessions (
   closed      boolean not null default false,
   -- 'event' for one occasion, 'tab' for the season tab. Fixed at creation.
   kind        text not null default 'event' check (kind in ('event', 'tab')),
+  -- The bar crew this list belongs to, if any. Empty for a list that is simply
+  -- shared with a code. Set once, by an admin of the list; see guard_session.
+  group_id    text references public.groups(id),
   host_id     uuid not null default auth.uid(),
   created_at  timestamptz not null default now()
 );
+
+create index if not exists sessions_group_idx on public.sessions (group_id);
 
 -- Who is allowed to see a session. A row is added only by the two functions
 -- below, so nobody can add themselves to a session they were not invited to.
@@ -39,6 +64,10 @@ create table if not exists public.session_people (
   id          text primary key,
   session_id  text not null references public.sessions(id) on delete cascade,
   name        text not null,
+  -- Free addition behind the name, such as the scouting group a guest belongs
+  -- to. It lands in the second column of the treasurer's export. Deliberately
+  -- not contact details: every phone in a shared list can read all of it.
+  note        text,
   paid        boolean not null default false,
   paid_cents  integer not null default 0,
   removed_at  timestamptz,
@@ -59,7 +88,12 @@ create table if not exists public.session_items (
   name        text not null,
   price_cents integer not null,
   category    text not null check (category in ('drink','food')),
-  hidden      boolean not null default false
+  hidden      boolean not null default false,
+  -- Which column of the treasurer's quarterly spreadsheet this item counts
+  -- towards. Empty means it lands in "Overig", which is money rather than a
+  -- count: a barbecue settled through the same invoice, for instance.
+  ledger      text check (ledger is null or ledger in
+                ('bier', 'bier-speciaal', 'fris', 'energie', 'chips', 'snoep', 'overig'))
 );
 
 -- The order log. Rows are only ever inserted, never updated or deleted, which
@@ -82,14 +116,84 @@ create index if not exists order_entries_session_idx on public.order_entries (se
 
 -- ------------------------------------------------------------- functions ---
 
--- Is the caller a member of this session? Used by every policy below.
+create or replace function public.is_group_member(p_group_id text)
+returns boolean language sql security definer stable
+set search_path = public as $$
+  select exists (
+    select 1 from public.group_members g
+    where g.group_id = p_group_id and g.user_id = auth.uid()
+  );
+$$;
+
+-- Is the caller a member of this session, or of the group it belongs to? Used
+-- by every policy below, which is why joining a group is enough to read and
+-- turf in all of its lists without a per-list code.
 create or replace function public.is_member(p_session_id text)
 returns boolean language sql security definer stable
 set search_path = public as $$
   select exists (
     select 1 from public.session_members m
     where m.session_id = p_session_id and m.user_id = auth.uid()
+  ) or exists (
+    select 1
+      from public.sessions s
+      join public.group_members g on g.group_id = s.group_id
+     where s.id = p_session_id and g.user_id = auth.uid()
   );
+$$;
+
+-- Making a group, joining one with its code, and leaving it again. Joining is
+-- only possible with the code, and a phone may only remove itself.
+create or replace function public.create_group(p_id text, p_name text, p_join_code text)
+returns void language plpgsql security definer
+set search_path = public as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Not signed in';
+  end if;
+
+  insert into public.groups (id, name, join_code, created_by)
+  values (p_id, p_name, upper(p_join_code), auth.uid());
+
+  insert into public.group_members (group_id, user_id)
+  values (p_id, auth.uid());
+end;
+$$;
+
+create or replace function public.join_group(p_join_code text)
+returns text language plpgsql security definer
+set search_path = public as $$
+declare
+  v_id text;
+begin
+  if auth.uid() is null then
+    raise exception 'Not signed in';
+  end if;
+
+  select id into v_id from public.groups where join_code = upper(p_join_code);
+  if v_id is null then
+    raise exception 'No group with that code';
+  end if;
+
+  insert into public.group_members (group_id, user_id)
+  values (v_id, auth.uid())
+  on conflict do nothing;
+
+  return v_id;
+end;
+$$;
+
+create or replace function public.leave_group(p_group_id text)
+returns void language plpgsql security definer
+set search_path = public as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Not signed in';
+  end if;
+
+  delete from public.group_members
+   where group_id = p_group_id and user_id = auth.uid();
+end;
 $$;
 
 -- Is the caller an admin of this session? Admins correct the list; see
@@ -426,6 +530,21 @@ begin
   new.join_code := old.join_code;
   new.host_id := old.host_id;
   new.created_at := old.created_at;
+
+  -- Putting a list into a group is an admin's call, only while it belongs to no
+  -- group, and only into a group the admin is in. After that it is fixed:
+  -- moving a list would quietly open it to another crew.
+  if new.group_id is distinct from old.group_id then
+    if old.group_id is null
+       and new.group_id is not null
+       and public.is_admin(old.id)
+       and public.is_group_member(new.group_id) then
+      null;
+    else
+      new.group_id := old.group_id;
+    end if;
+  end if;
+
   if not public.is_admin(old.id) then
     new.closed := old.closed;
   end if;
@@ -497,6 +616,24 @@ drop policy if exists admins_read on public.session_admins;
 create policy admins_read on public.session_admins
   for select using (public.is_member(session_id));
 
+-- A group is visible to the phones in it, and a phone may name only itself.
+-- Creating, joining and leaving go through the functions above, which check who
+-- is asking, so there is deliberately no insert or delete policy.
+alter table public.groups        enable row level security;
+alter table public.group_members enable row level security;
+
+drop policy if exists groups_read on public.groups;
+create policy groups_read on public.groups
+  for select using (public.is_group_member(id));
+
+drop policy if exists group_members_read on public.group_members;
+create policy group_members_read on public.group_members
+  for select using (public.is_group_member(group_id));
+
+drop policy if exists group_members_name_own on public.group_members;
+create policy group_members_name_own on public.group_members
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
 -- ------------------------------------------------------------- realtime ----
 
 alter table public.sessions        replica identity full;
@@ -505,6 +642,8 @@ alter table public.session_people replica identity full;
 alter table public.session_items  replica identity full;
 alter table public.order_entries  replica identity full;
 alter table public.session_admins replica identity full;
+alter table public.groups         replica identity full;
+alter table public.group_members  replica identity full;
 
 do $$
 begin
@@ -514,5 +653,7 @@ begin
   alter publication supabase_realtime add table public.session_items;
   alter publication supabase_realtime add table public.order_entries;
   alter publication supabase_realtime add table public.session_admins;
+  alter publication supabase_realtime add table public.groups;
+  alter publication supabase_realtime add table public.group_members;
 exception when duplicate_object then null;
 end $$;

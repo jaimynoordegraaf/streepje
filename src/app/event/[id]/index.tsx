@@ -337,6 +337,7 @@ export default function EventScreen() {
                     </Text>
                     <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 2 }}>
                       {count} {count === 1 ? 'consumptie' : 'consumpties'}
+                      {person.note ? ' · ' + person.note : ''}
                       {host ? ' · gast van ' + host : ''}
                     </Text>
                   </View>
@@ -374,7 +375,11 @@ export default function EventScreen() {
         hosts={people.filter((person) => person.memberId !== null)}
         onCancel={() => setAdding(null)}
         onSubmit={(guest) => {
-          addPerson(id, guest.name, { billing: guest.billing, guestOf: guest.guestOf });
+          addPerson(id, guest.name, {
+            billing: guest.billing,
+            guestOf: guest.guestOf,
+            note: guest.note,
+          });
           setAdding(null);
         }}
       />

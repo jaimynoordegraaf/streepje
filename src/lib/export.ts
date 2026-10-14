@@ -10,8 +10,10 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Share } from 'react-native';
 
+import { csvRow, formatDate, formatDateTime } from './csv';
 import { centsToPlainNumber, formatCents } from './money';
 import { useStore } from './store';
+import { buildTreasurerCsv, type Period } from './treasurer';
 import {
   correctionCount,
   activePeople,
@@ -32,40 +34,10 @@ import {
 } from './totals';
 import type { AppEvent, Person } from './types';
 
-/**
- * Excel on some systems (notably Dutch/German Windows) expects a semicolon
- * instead of a comma. If your export lands entirely in column A, change this
- * to ';' and re-export.
- */
-const DELIMITER = ',';
-
-/** Wrap a value in quotes when it contains something that would break the CSV. */
-function csvCell(value: string | number): string {
-  const text = String(value);
-  if (text.includes(DELIMITER) || text.includes('"') || text.includes('\n')) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
-}
-
-function csvRow(cells: (string | number)[]): string {
-  return cells.map(csvCell).join(DELIMITER);
-}
-
-function pad(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-/** Local date as yyyy-mm-dd (not UTC, so it matches the phone's calendar). */
-export function formatDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-export function formatDateTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  return `${formatDate(timestamp)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+// De CSV-bouwstenen en de datumopmaak staan in csv.ts, zodat de rekenkant van
+// een export los van Expo te testen is. Hier opnieuw naar buiten gebracht,
+// want half de app haalt formatDate en formatDateTime hiervandaan.
+export { formatDate, formatDateTime } from './csv';
 
 export function buildCsv(event: AppEvent, local?: LocalDevice): string {
   const rows: string[] = [];
@@ -100,12 +72,13 @@ export function buildCsv(event: AppEvent, local?: LocalDevice): string {
 
   rows.push(csvRow(['OVERZICHT']));
   rows.push(
-    csvRow(['Persoon', 'Consumpties', 'Totaal', 'Afrekening', 'Gast van', 'Betaald', 'Openstaand', 'Betaald op'])
+    csvRow(['Persoon', 'Toevoeging', 'Consumpties', 'Totaal', 'Afrekening', 'Gast van', 'Betaald', 'Openstaand', 'Betaald op'])
   );
   for (const person of activePeople(event)) {
     rows.push(
       csvRow([
         person.name,
+        person.note ?? '',
         personItemCount(event, person.id),
         centsToPlainNumber(personTotalCents(event, person.id)),
         paysTonight(event, person) ? 'vanavond' : 'op factuur',
@@ -249,6 +222,10 @@ export function buildPersonRequest(event: AppEvent, person: Person): string {
   return lines.join('\n');
 }
 
+// De berekening voor de penningmeester staat in treasurer.ts; hier alleen
+// het wegschrijven en delen van het bestand.
+export { periodsInEvent, wholeEventPeriod, type Period } from './treasurer';
+
 /** Make a safe filename out of the event name, e.g. "BBQ 12 Sept" -> "bbq-12-sept". */
 function slugify(name: string): string {
   return (
@@ -282,6 +259,27 @@ export async function exportCsv(event: AppEvent): Promise<void> {
   await Sharing.shareAsync(file.uri, {
     mimeType: 'text/csv',
     dialogTitle: `Exporteren: ${event.name}`,
+    UTI: 'public.comma-separated-values-text',
+  });
+}
+
+/** Hetzelfde als exportCsv, maar dan het blok voor de penningmeester. */
+export async function exportTreasurerCsv(event: AppEvent, period: Period): Promise<void> {
+  const stamp = period.label === 'Hele lijst' ? formatDate(period.from) : period.label.replace(' ', '-');
+  const filename = `penningmeester-${slugify(event.name)}-${stamp}.csv`;
+  const file = new File(Paths.cache, filename);
+
+  if (file.exists) file.delete();
+  file.create();
+  file.write(`﻿${buildTreasurerCsv(event, period)}`);
+
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error('Delen is niet beschikbaar op dit apparaat.');
+  }
+
+  await Sharing.shareAsync(file.uri, {
+    mimeType: 'text/csv',
+    dialogTitle: `Penningmeester: ${event.name}`,
     UTI: 'public.comma-separated-values-text',
   });
 }

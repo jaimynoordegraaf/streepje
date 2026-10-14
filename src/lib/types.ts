@@ -10,11 +10,26 @@
 export type Category = 'drink' | 'food';
 
 /** One thing that can be ordered, e.g. "Beer" at 250 cents. */
+/**
+ * Onder welke kolom van de penningmeester dit item valt. Zie `ledger.ts`: de
+ * kwartaalfactuur heeft een vaste indeling die ouder is dan deze app.
+ */
+export type LedgerCategory =
+  | 'bier'
+  | 'bier-speciaal'
+  | 'fris'
+  | 'energie'
+  | 'chips'
+  | 'snoep'
+  | 'overig';
+
 export type MenuItem = {
   id: string;
   name: string;
   priceCents: number;
   category: Category;
+  /** Kolom van de penningmeester. Ontbreekt hij, dan telt het item als Overig. */
+  ledger?: LedgerCategory;
   /**
    * Taken off the menu, but kept so past turfs still have a price and still
    * count. Removing an item used to delete every turf for it.
@@ -32,6 +47,15 @@ export type SavedPerson = {
 export type Person = {
   id: string;
   name: string;
+  /**
+   * Vrije toevoeging achter de naam, bijvoorbeeld de scoutinggroep waar een
+   * gast vandaan komt. Komt in de export in de tweede kolom te staan.
+   *
+   * Nadrukkelijk geen contactgegevens: elke telefoon die aan een gedeelde
+   * lijst meedoet kan alles lezen, en wie betaald moet worden gaat buiten de
+   * app om naar de penningmeester.
+   */
+  note?: string;
   /**
    * How much has actually been handed over, in cents.
    *

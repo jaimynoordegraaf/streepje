@@ -6,8 +6,16 @@ import { Text } from '@/components/text';
 
 import { Button, Card, EmptyState, Screen, useBottomInset } from '@/components/ui';
 import { describeError } from '@/lib/errors';
-import { PromptModal } from '@/components/modals';
-import { exportCsv, formatDateTime, sharePersonRequest, shareSummary } from '@/lib/export';
+import { PeriodModal, PromptModal } from '@/components/modals';
+import {
+  exportCsv,
+  exportTreasurerCsv,
+  formatDateTime,
+  periodsInEvent,
+  sharePersonRequest,
+  shareSummary,
+  wholeEventPeriod,
+} from '@/lib/export';
 import { parsePrice } from '@/lib/money';
 import { formatCents } from '@/lib/money';
 import { isAdminDevice } from '@/lib/pin';
@@ -40,6 +48,7 @@ export default function TotalsScreen() {
   const deviceId = useStore((state) => state.deviceId);
   const deviceName = useStore((state) => state.deviceName);
   const [busy, setBusy] = useState(false);
+  const [choosingPeriod, setChoosingPeriod] = useState(false);
   const bottomInset = useBottomInset();
 
   if (!event) {
@@ -156,6 +165,24 @@ export default function TotalsScreen() {
                   variant="secondary"
                   disabled={busy}
                   onPress={() => runExport(() => shareSummary(event))}
+                />
+                {/* Het blok voor de kwartaalfactuur. Een lopende rekening loopt
+                    over meerdere kwartalen, dus daar vraagt de app eerst welke;
+                    een evenement van één avond is zelf de periode. */}
+                <Button
+                  title="Export penningmeester"
+                  variant="secondary"
+                  disabled={busy}
+                  onPress={() => {
+                    const periods = periodsInEvent(event);
+                    if (periods.length <= 1) {
+                      runExport(() =>
+                        exportTreasurerCsv(event, periods[0] ?? wholeEventPeriod(event))
+                      );
+                      return;
+                    }
+                    setChoosingPeriod(true);
+                  }}
                 />
               </View>
             </Card>
@@ -330,6 +357,16 @@ export default function TotalsScreen() {
             setPersonPayment(id, payingPerson.id, payingPerson.paidCents + amount);
           }
           setPayingPerson(null);
+        }}
+      />
+
+      <PeriodModal
+        visible={choosingPeriod}
+        periods={periodsInEvent(event)}
+        onCancel={() => setChoosingPeriod(false)}
+        onSubmit={(period) => {
+          setChoosingPeriod(false);
+          runExport(() => exportTreasurerCsv(event, period));
         }}
       />
     </Screen>

@@ -8,8 +8,17 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } fr
 
 import { Text } from '@/components/text';
 
+import { guessLedger, LEDGER } from '@/lib/ledger';
 import { centsToInput, parsePrice } from '@/lib/money';
-import type { AppEvent, Billing, Category, ListKind, MenuItem, Person } from '@/lib/types';
+import type {
+  AppEvent,
+  Billing,
+  Category,
+  LedgerCategory,
+  ListKind,
+  MenuItem,
+  Person,
+} from '@/lib/types';
 import { radius, space, useTheme } from '@/theme';
 
 import { CheckIcon } from './icons';
@@ -121,13 +130,19 @@ export function ItemFormModal({
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState<Category>('drink');
+  // Null zolang niemand hem heeft aangeraakt: dan volgt de keuze de naam die
+  // wordt getypt, zodat een nieuw biertje vanzelf onder Bier terechtkomt.
+  const [ledger, setLedger] = useState<LedgerCategory | null>(null);
 
   useEffect(() => {
     if (!visible) return;
     setName(item?.name ?? '');
     setPrice(item ? centsToInput(item.priceCents) : '');
     setCategory(item?.category ?? 'drink');
+    setLedger(item?.ledger ?? null);
   }, [visible, item]);
+
+  const chosenLedger = ledger ?? guessLedger(name);
 
   const priceCents = parsePrice(price);
   const valid = name.trim() !== '' && priceCents !== null;
@@ -180,17 +195,97 @@ export function ItemFormModal({
           })}
         </View>
 
+        <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>
+          KOLOM PENNINGMEESTER
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+          {LEDGER.map((option) => {
+            const selected = chosenLedger === option.value;
+            return (
+              <Pressable
+                key={option.value}
+                onPress={() => setLedger(option.value)}
+                style={{
+                  paddingVertical: 8,
+                  paddingHorizontal: space.md,
+                  borderRadius: radius.pill,
+                  backgroundColor: selected ? theme.accent : theme.chip,
+                }}>
+                <Text style={{ color: selected ? theme.onAccent : theme.text, fontWeight: '600' }}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 18 }}>
+          {chosenLedger === 'overig'
+            ? 'Overig telt in de kwartaalexport als bedrag, niet als aantal. Daar hoort bijvoorbeeld een BBQ.'
+            : 'In de kwartaalexport telt dit item mee als aantal in deze kolom.'}
+        </Text>
+
         <View style={{ flexDirection: 'row', gap: space.sm }}>
           <Button title="Annuleren" variant="secondary" onPress={onCancel} style={{ flex: 1 }} />
           <Button
             title="Opslaan"
             disabled={!valid}
             onPress={() =>
-              onSubmit({ name: name.trim(), priceCents: priceCents ?? 0, category })
+              onSubmit({ name: name.trim(), priceCents: priceCents ?? 0, category, ledger: chosenLedger })
             }
             style={{ flex: 1 }}
           />
         </View>
+      </Backdrop>
+    </Modal>
+  );
+}
+
+/**
+ * Kiezen over welke periode de export gaat.
+ *
+ * De penningmeester plakt per blok één periode in zijn spreadsheet, en voor de
+ * lopende rekening is dat per kwartaal. Een evenement van één avond heeft maar
+ * één keuze, en dan slaat het scherm die vraag over.
+ */
+export function PeriodModal<T extends { label: string }>({
+  visible,
+  periods,
+  onCancel,
+  onSubmit,
+}: {
+  visible: boolean;
+  periods: T[];
+  onCancel: () => void;
+  onSubmit: (period: T) => void;
+}) {
+  const theme = useTheme();
+  if (!visible) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <Backdrop onCancel={onCancel}>
+        <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>Welke periode?</Text>
+        <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 18 }}>
+          Eén blok voor de penningmeester: aantallen per kolom, en Overig als bedrag.
+        </Text>
+
+        <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={{ gap: space.sm }}>
+          {periods.map((period) => (
+            <Pressable
+              key={period.label}
+              onPress={() => onSubmit(period)}
+              style={{
+                paddingVertical: 14,
+                paddingHorizontal: space.md,
+                borderRadius: radius.md,
+                backgroundColor: theme.chip,
+              }}>
+              <Text style={{ color: theme.text, fontWeight: '600' }}>{period.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <Button title="Annuleren" variant="secondary" onPress={onCancel} />
       </Backdrop>
     </Modal>
   );
@@ -338,16 +433,23 @@ export function GuestModal({
   /** Members at the event whom a guest could have come with. */
   hosts: Person[];
   onCancel: () => void;
-  onSubmit: (guest: { name: string; billing: Billing; guestOf: string | null }) => void;
+  onSubmit: (guest: {
+    name: string;
+    billing: Billing;
+    guestOf: string | null;
+    note: string;
+  }) => void;
 }) {
   const theme = useTheme();
   const [name, setName] = useState('');
+  const [note, setNote] = useState('');
   const [billing, setBilling] = useState<Billing>('tonight');
   const [guestOf, setGuestOf] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible) return;
     setName('');
+    setNote('');
     setBilling('tonight');
     setGuestOf(null);
   }, [visible]);
@@ -356,7 +458,7 @@ export function GuestModal({
 
   const submit = () => {
     if (name.trim() === '') return;
-    onSubmit({ name: name.trim(), billing, guestOf });
+    onSubmit({ name: name.trim(), billing, guestOf, note: note.trim() });
   };
 
   const hostOptions: { id: string | null; name: string }[] = [
@@ -369,6 +471,15 @@ export function GuestModal({
       <Backdrop onCancel={onCancel}>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>Gast toevoegen</Text>
         <Field value={name} onChangeText={setName} placeholder="Naam" autoFocus />
+        <Field
+          value={note}
+          onChangeText={setNote}
+          placeholder="Toevoeging, bijv. Scouting Nehalennia"
+        />
+        <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 18 }}>
+          Komt in de export naast de naam te staan. Geen telefoonnummers of adressen: iedereen
+          die aan deze lijst meedoet kan het lezen.
+        </Text>
 
         <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>AFREKENEN</Text>
         <Choice

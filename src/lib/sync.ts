@@ -20,6 +20,7 @@ import { isSettled } from './totals';
 import type {
   AppEvent,
   Category,
+  LedgerCategory,
   ListKind,
   MenuItem,
   OrderEntry,
@@ -32,6 +33,8 @@ type PersonRow = {
   id: string;
   session_id: string;
   name: string;
+  /** Vrije toevoeging, bijvoorbeeld de scoutinggroep van een gast. */
+  note: string | null;
   /** Kept in step for older clients; paid_cents is what counts. */
   paid: boolean;
   paid_cents: number;
@@ -50,6 +53,8 @@ type ItemRow = {
   price_cents: number;
   category: string;
   hidden: boolean;
+  /** Null for items from before the treasurer's columns existed. */
+  ledger: LedgerCategory | null;
 };
 type EntryRow = {
   id: string;
@@ -69,6 +74,7 @@ type EntryRow = {
 const toPerson = (row: PersonRow): Person => ({
   id: row.id,
   name: row.name,
+  note: row.note ?? undefined,
   paidCents: row.paid_cents ?? 0,
   paidAt: row.paid_at ? Date.parse(row.paid_at) : null,
   removedAt: row.removed_at ? Date.parse(row.removed_at) : null,
@@ -82,6 +88,7 @@ const fromPerson = (sessionId: string, person: Person, settled: boolean): Person
   id: person.id,
   session_id: sessionId,
   name: person.name,
+  note: person.note ?? null,
   paid: settled,
   paid_cents: person.paidCents,
   paid_at: person.paidAt ? new Date(person.paidAt).toISOString() : null,
@@ -98,6 +105,7 @@ const toItem = (row: ItemRow): MenuItem => ({
   priceCents: row.price_cents,
   category: row.category as Category,
   hidden: row.hidden ?? false,
+  ledger: row.ledger ?? undefined,
 });
 
 const fromItem = (sessionId: string, item: MenuItem): ItemRow => ({
@@ -107,6 +115,7 @@ const fromItem = (sessionId: string, item: MenuItem): ItemRow => ({
   price_cents: item.priceCents,
   category: item.category,
   hidden: item.hidden ?? false,
+  ledger: item.ledger ?? null,
 });
 
 const toEntry = (row: EntryRow): OrderEntry => ({

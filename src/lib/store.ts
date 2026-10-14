@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { guessLedger } from './ledger';
 import type {
   AppEvent,
   Billing,
@@ -44,11 +45,18 @@ export function newJoinCode(): string {
 function newPerson(
   event: AppEvent,
   name: string,
-  options: { memberId?: string | null; billing?: Billing; guestOf?: string | null } = {}
+  options: {
+    memberId?: string | null;
+    billing?: Billing;
+    guestOf?: string | null;
+    note?: string;
+  } = {}
 ): Person {
+  const note = options.note?.trim();
   return {
     id: newId(),
     name,
+    note: note ? note : undefined,
     paidCents: 0,
     paidAt: null,
     removedAt: null,
@@ -118,7 +126,7 @@ type StoreState = {
   addPerson: (
     eventId: string,
     name: string,
-    options?: { billing?: Billing; guestOf?: string | null }
+    options?: { billing?: Billing; guestOf?: string | null; note?: string }
   ) => void;
   /**
    * Copy members from the season tab into an event, each linked to their row
@@ -129,6 +137,8 @@ type StoreState = {
   setPersonBilling: (eventId: string, personId: string, billing: Billing) => void;
   /** Who a guest came with. */
   setGuestOf: (eventId: string, personId: string, guestOf: string | null) => void;
+  /** Vrije toevoeging achter de naam, bijvoorbeeld een scoutinggroep. */
+  setPersonNote: (eventId: string, personId: string, note: string) => void;
   /** Add several names at once, skipping any already in the event. */
   addPeople: (eventId: string, names: string[]) => void;
   /**
@@ -318,6 +328,18 @@ export const useStore = create<StoreState>()(
             ...event,
             people: event.people.map((person) =>
               person.id === personId ? { ...person, billing } : person
+            ),
+          })),
+        }),
+
+      setPersonNote: (eventId, personId, note) =>
+        set({
+          events: mapEvent(get().events, eventId, (event) => ({
+            ...event,
+            people: event.people.map((person) =>
+              person.id === personId
+                ? { ...person, note: note.trim() === '' ? undefined : note.trim() }
+                : person
             ),
           })),
         }),
@@ -575,7 +597,7 @@ export const useStore = create<StoreState>()(
     {
       name: 'turf-store-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 10,
+      version: 11,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -745,6 +767,20 @@ export const useStore = create<StoreState>()(
               billing: person.billing ?? 'tonight',
               guestOf: person.guestOf ?? null,
             })),
+          }));
+        }
+
+        if (fromVersion < 11) {
+          // Menu-items krijgen een kolom van de penningmeester. Voor wat er al
+          // stond is de naam de enige aanwijzing; de beheerder ziet de gok bij
+          // elk item staan en zet hem recht waar nodig.
+          const label = (items: MenuItem[] = []) =>
+            items.map((item) => ({ ...item, ledger: item.ledger ?? guessLedger(item.name) }));
+
+          state.defaultMenu = label(state.defaultMenu);
+          state.events = (state.events ?? []).map((event: AppEvent) => ({
+            ...event,
+            menu: label(event.menu),
           }));
         }
 

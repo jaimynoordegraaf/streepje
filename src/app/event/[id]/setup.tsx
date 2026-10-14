@@ -37,6 +37,7 @@ export default function SetupScreen() {
   const removePerson = useStore((state) => state.removePerson);
   const restorePerson = useStore((state) => state.restorePerson);
   const setPersonBilling = useStore((state) => state.setPersonBilling);
+  const setPersonNote = useStore((state) => state.setPersonNote);
   const deviceName = useStore((state) => state.deviceName);
   const addItem = useStore((state) => state.addItem);
   const updateItem = useStore((state) => state.updateItem);
@@ -45,6 +46,7 @@ export default function SetupScreen() {
   const [renamingEvent, setRenamingEvent] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
   const [renamingPerson, setRenamingPerson] = useState<Person | null>(null);
+  const [notingPerson, setNotingPerson] = useState<Person | null>(null);
   // 'change' asks for the current code first, then for the new one.
   const [pinStep, setPinStep] = useState<'none' | 'set' | 'change' | 'change-new'>('none');
   // Who is waiting on the PIN before being removed.
@@ -250,6 +252,14 @@ export default function SetupScreen() {
                   <Pressable onPress={() => setRenamingPerson(person)} hitSlop={8}>
                     <Text style={{ color: theme.link, fontWeight: '600' }}>Hernoemen</Text>
                   </Pressable>
+                  {/* Alleen voor gasten: bij een lid staat de naam al vast in
+                      de lopende rekening, en die hoort bij de penningmeester
+                      thuis onder zijn eigen naam. */}
+                  {person.memberId === null ? (
+                    <Pressable onPress={() => setNotingPerson(person)} hitSlop={8}>
+                      <Text style={{ color: theme.link, fontWeight: '600' }}>Toevoeging</Text>
+                    </Pressable>
+                  ) : null}
                   {/* Removing someone changes the takings, so not on a closed event. */}
                   {event.closed ? null : (
                     <Pressable onPress={() => confirmRemovePerson(person)} hitSlop={8}>
@@ -517,6 +527,19 @@ export default function SetupScreen() {
         onSet={(record) => {
           setCorrectionPin(id, record);
           reopen();
+        }}
+      />
+
+      <PromptModal
+        visible={notingPerson !== null}
+        title={notingPerson ? `Toevoeging bij ${notingPerson.name}` : 'Toevoeging'}
+        placeholder="bijv. Scouting Nehalennia"
+        initialValue={notingPerson?.note ?? ''}
+        submitLabel="Opslaan"
+        onCancel={() => setNotingPerson(null)}
+        onSubmit={(value) => {
+          if (notingPerson) setPersonNote(id, notingPerson.id, value);
+          setNotingPerson(null);
         }}
       />
 
