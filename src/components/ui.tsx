@@ -229,6 +229,8 @@ export function Field({
   keyboardType = 'default',
   autoFocus = false,
   onSubmitEditing,
+  /** Meerdere regels, voor een idee of toelichting in plaats van een naam. */
+  multiline = false,
 }: {
   value: string;
   onChangeText: (text: string) => void;
@@ -236,6 +238,7 @@ export function Field({
   keyboardType?: 'default' | 'decimal-pad';
   autoFocus?: boolean;
   onSubmitEditing?: () => void;
+  multiline?: boolean;
 }) {
   const theme = useTheme();
   return (
@@ -246,9 +249,14 @@ export function Field({
       placeholderTextColor={theme.textDim}
       keyboardType={keyboardType}
       autoFocus={autoFocus}
-      onSubmitEditing={onSubmitEditing}
-      returnKeyType="done"
+      onSubmitEditing={multiline ? undefined : onSubmitEditing}
+      // Bij één regel sluit de returntoets het veld af; bij meerdere regels
+      // moet diezelfde toets juist een nieuwe regel maken.
+      returnKeyType={multiline ? 'default' : 'done'}
+      multiline={multiline}
+      textAlignVertical={multiline ? 'top' : 'center'}
       style={{
+        ...(multiline ? { minHeight: 120 } : null),
         backgroundColor: theme.background,
         borderWidth: 1,
         borderColor: theme.border,

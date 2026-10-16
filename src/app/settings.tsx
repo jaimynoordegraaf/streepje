@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
 
@@ -17,6 +17,7 @@ import { space, useTheme } from '@/theme';
 
 export default function SettingsScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const defaultMenu = useStore((state) => state.defaultMenu);
   const addDefaultItem = useStore((state) => state.addDefaultItem);
   const updateDefaultItem = useStore((state) => state.updateDefaultItem);
@@ -257,6 +258,21 @@ export default function SettingsScreen() {
                 </Text>
               </>
             )}
+          </View>
+        ) : null}
+
+        {isSyncConfigured ? (
+          <View style={{ gap: space.sm, marginTop: space.md }}>
+            <SectionTitle>Ideeën</SectionTitle>
+            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+              Mis je iets achter de bar, of werkt iets onhandig? Stuur het in. Iedereen uit de
+              groep ziet de lijst, dus je ziet meteen of iemand het al bedacht had.
+            </Text>
+            <Button
+              title="Ideeën bekijken en insturen"
+              variant="secondary"
+              onPress={() => router.push('/ideas')}
+            />
           </View>
         ) : null}
 

@@ -96,6 +96,22 @@ create table if not exists public.session_items (
                 ('bier', 'bier-speciaal', 'fris', 'energie', 'chips', 'snoep', 'overig'))
 );
 
+-- Ideas sent in from the app. They belong to a group, so the whole bar crew
+-- sees what has been suggested. Who sent it is a phone name, not a person: the
+-- app knows phones, not people.
+create table if not exists public.ideas (
+  id           text primary key,
+  group_id     text references public.groups(id) on delete cascade,
+  body         text not null check (char_length(body) between 1 and 2000),
+  device_name  text,
+  app_version  text,
+  platform     text,
+  created_by   uuid not null default auth.uid(),
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists ideas_group_idx on public.ideas (group_id, created_at desc);
+
 -- The order log. Rows are only ever inserted, never updated or deleted, which
 -- is what lets several phones log at once without overwriting each other.
 create table if not exists public.order_entries (
@@ -633,6 +649,28 @@ create policy group_members_read on public.group_members
 drop policy if exists group_members_name_own on public.group_members;
 create policy group_members_name_own on public.group_members
   for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Ideas: send one in on your own name, read what your group has sent, and
+-- withdraw your own. No update policy: an idea stands as it was written.
+alter table public.ideas enable row level security;
+
+drop policy if exists ideas_insert on public.ideas;
+create policy ideas_insert on public.ideas
+  for insert with check (
+    created_by = auth.uid()
+    and (group_id is null or public.is_group_member(group_id))
+  );
+
+drop policy if exists ideas_read on public.ideas;
+create policy ideas_read on public.ideas
+  for select using (
+    created_by = auth.uid()
+    or (group_id is not null and public.is_group_member(group_id))
+  );
+
+drop policy if exists ideas_delete_own on public.ideas;
+create policy ideas_delete_own on public.ideas
+  for delete using (created_by = auth.uid());
 
 -- ------------------------------------------------------------- realtime ----
 

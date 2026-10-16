@@ -12,6 +12,11 @@ import * as Updates from 'expo-updates';
 
 import { formatDateTime } from './export';
 
+/** Het versienummer alleen, bijvoorbeeld om bij een ingestuurd idee te zetten. */
+export function appVersion(): string | null {
+  return Constants.expoConfig?.version ?? Updates.runtimeVersion ?? null;
+}
+
 export function versionLine(): string {
   const version = Constants.expoConfig?.version ?? Updates.runtimeVersion ?? '?';
   const parts = ['Versie ' + version];

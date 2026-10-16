@@ -271,6 +271,82 @@ export type RemoteSession = {
   entries: OrderEntry[];
 };
 
+// -------------------------------------------------------------- ideeën ----
+
+/** Een idee zoals het in de app getoond wordt. */
+export type Idea = {
+  id: string;
+  body: string;
+  deviceName: string | null;
+  appVersion: string | null;
+  platform: string | null;
+  createdAt: number;
+  /** Of deze telefoon de inzender is; alleen die mag hem terugtrekken. */
+  mine: boolean;
+};
+
+/**
+ * Een idee insturen.
+ *
+ * Hoort bij de groep, zodat de hele ploeg ziet wat er al bedacht is. Versie en
+ * platform gaan mee: bij "dat knopje doet het niet" scheelt dat zoeken.
+ */
+export async function submitIdea(idea: {
+  id: string;
+  body: string;
+  groupId: string | null;
+  deviceName: string | null;
+  appVersion: string | null;
+  platform: string;
+}): Promise<void> {
+  await ensureSignedIn();
+  const { error } = await client().from('ideas').insert({
+    id: idea.id,
+    group_id: idea.groupId,
+    body: idea.body,
+    device_name: idea.deviceName,
+    app_version: idea.appVersion,
+    platform: idea.platform,
+  });
+  if (error) throw error;
+}
+
+/** De ideeën van de groep, nieuwste eerst. Zonder groep: alleen je eigen. */
+export async function fetchIdeas(groupId: string | null): Promise<Idea[]> {
+  const me = await ensureSignedIn();
+  const db = client();
+
+  let query = db
+    .from('ideas')
+    .select('id, body, device_name, app_version, platform, created_at, created_by')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  // Zonder groep laat de policy alleen je eigen inzendingen zien; met groep
+  // filteren we erop, zodat een oude inzending van een andere ploeg niet
+  // tussen de lijst van vanavond komt te staan.
+  if (groupId) query = query.eq('group_id', groupId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    body: row.body as string,
+    deviceName: (row.device_name as string | null) ?? null,
+    appVersion: (row.app_version as string | null) ?? null,
+    platform: (row.platform as string | null) ?? null,
+    createdAt: Date.parse(row.created_at as string),
+    mine: row.created_by === me,
+  }));
+}
+
+/** Je eigen inzending terugtrekken. De database laat alleen die van jou toe. */
+export async function deleteIdea(id: string): Promise<void> {
+  await ensureSignedIn();
+  const { error } = await client().from('ideas').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // ------------------------------------------------------------- groepen ----
 
 /**
