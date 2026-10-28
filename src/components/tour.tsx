@@ -19,6 +19,7 @@
 import { usePathname, useRouter } from 'expo-router';
 import { ReactNode, useEffect } from 'react';
 import {
+  BackHandler,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -124,11 +125,10 @@ export function TourOverlay() {
    * Zorg dat het scherm eronder bij de stap hoort.
    *
    * Vergelijken met het pad dat er nu staat, in plaats van onthouden waar we
-   * al geweest zijn. Dat scheelt twee dingen. Twee stappen over hetzelfde
-   * scherm varen niet opnieuw, en opnieuw varen zou dat scherm opbouwen en
-   * daarmee de gemeten plek van de knop weggooien. En wie op Android de
-   * terugknop indrukt komt vanzelf weer terug bij de stap: het pad klopt dan
-   * niet meer met waar de rondleiding is, dus wordt er opnieuw gevaren.
+   * al geweest zijn. Twee stappen over hetzelfde scherm varen zo niet opnieuw,
+   * en opnieuw varen zou dat scherm opbouwen en daarmee de gemeten plek van de
+   * knop weggooien. Het is meteen het vangnet: komt het scherm eronder ooit
+   * toch niet overeen met de stap, dan wordt er alsnog gevaren.
    */
   useEffect(() => {
     if (!active || !demoEventId || !demoPersonId) return;
@@ -156,6 +156,21 @@ export function TourOverlay() {
         break;
     }
   }, [active, step, demoEventId, demoPersonId, pathname, router]);
+
+  /**
+   * De terugknop van Android doet tijdens de rondleiding niets.
+   *
+   * Zoals een tik op het scherm eronder ook niets doet. Hier is het verschil
+   * dat terug niet alleen de verkeerde kant op zou varen: de rondleiding vaart
+   * met `replace`, dus er is geen scherm om naar terug te gaan en Android
+   * sluit dan de app af -- midden in de uitleg, en daarna begint hij opnieuw.
+   * Weg komen kan altijd met Overslaan, dat elke stap in beeld staat.
+   */
+  useEffect(() => {
+    if (!active) return;
+    const back = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => back.remove();
+  }, [active]);
 
   // De voorbeeldlijst is er nog niet in het tikje tussen aanzetten en aanmaken.
   if (!active || !current || !demoEventId) return null;
