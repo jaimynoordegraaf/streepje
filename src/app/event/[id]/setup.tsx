@@ -5,7 +5,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { MenuEditor } from '@/components/menu-editor';
-import { PromptModal, whenAlertClosed } from '@/components/modals';
+import { PromptModal, SavedPeoplePickerModal, whenAlertClosed } from '@/components/modals';
 import { PinModal } from '@/components/pin-modal';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import {
@@ -33,6 +33,7 @@ export default function SetupScreen() {
   const addPerson = useStore((state) => state.addPerson);
   const addPeople = useStore((state) => state.addPeople);
   const defaultPeople = useStore((state) => state.defaultPeople);
+  const sections = useStore((state) => state.sections);
   const renamePerson = useStore((state) => state.renamePerson);
   const removePerson = useStore((state) => state.removePerson);
   const restorePerson = useStore((state) => state.restorePerson);
@@ -45,6 +46,7 @@ export default function SetupScreen() {
 
   const [renamingEvent, setRenamingEvent] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
+  const [pickingSaved, setPickingSaved] = useState(false);
   const [renamingPerson, setRenamingPerson] = useState<Person | null>(null);
   const [notingPerson, setNotingPerson] = useState<Person | null>(null);
   // 'change' asks for the current code first, then for the new one.
@@ -317,7 +319,7 @@ export default function SetupScreen() {
                 ).length
               })`}
               variant="secondary"
-              onPress={() => addPeople(id, defaultPeople.map((person) => person.name))}
+              onPress={() => setPickingSaved(true)}
             />
           ) : null}
         </View>
@@ -419,6 +421,18 @@ export default function SetupScreen() {
         onSubmit={(name) => {
           renameEvent(id, name);
           setRenamingEvent(false);
+        }}
+      />
+
+      <SavedPeoplePickerModal
+        visible={pickingSaved}
+        people={defaultPeople}
+        sections={sections}
+        alreadyIn={event.people.map((person) => person.name)}
+        onCancel={() => setPickingSaved(false)}
+        onSubmit={(names) => {
+          addPeople(id, names);
+          setPickingSaved(false);
         }}
       />
 

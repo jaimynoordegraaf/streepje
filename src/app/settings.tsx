@@ -5,14 +5,14 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { MenuEditor } from '@/components/menu-editor';
-import { PromptModal } from '@/components/modals';
+import { PromptModal, SectionPickerModal } from '@/components/modals';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { describeError } from '@/lib/errors';
 import { newId, newJoinCode, useStore } from '@/lib/store';
 import { useStartTour } from '@/lib/tour';
 import { isSyncConfigured } from '@/lib/supabase';
 import { createGroup, joinGroup, leaveGroup, leaveSession, setMemberName } from '@/lib/sync';
-import type { SavedPerson } from '@/lib/types';
+import type { SavedPerson, Section } from '@/lib/types';
 import { versionLine } from '@/lib/version';
 import { space, useTheme } from '@/theme';
 
@@ -27,11 +27,21 @@ export default function SettingsScreen() {
   const addDefaultPerson = useStore((state) => state.addDefaultPerson);
   const renameDefaultPerson = useStore((state) => state.renameDefaultPerson);
   const removeDefaultPerson = useStore((state) => state.removeDefaultPerson);
+  const setDefaultPersonSection = useStore((state) => state.setDefaultPersonSection);
+  const sections = useStore((state) => state.sections);
+  const addSection = useStore((state) => state.addSection);
+  const renameSection = useStore((state) => state.renameSection);
+  const removeSection = useStore((state) => state.removeSection);
   const deviceName = useStore((state) => state.deviceName);
   const setDeviceName = useStore((state) => state.setDeviceName);
   const events = useStore((state) => state.events);
   const [addingPerson, setAddingPerson] = useState(false);
   const [renamingPerson, setRenamingPerson] = useState<SavedPerson | null>(null);
+  const [addingSection, setAddingSection] = useState(false);
+  const [renamingSection, setRenamingSection] = useState<Section | null>(null);
+  // Wie er op een speltak wacht. De naam staat erbij, zodat het venster kan
+  // zeggen over wie het gaat.
+  const [sectioningPerson, setSectioningPerson] = useState<SavedPerson | null>(null);
   const [namingDevice, setNamingDevice] = useState(false);
   const group = useStore((state) => state.group);
   const setGroup = useStore((state) => state.setGroup);
@@ -134,11 +144,71 @@ export default function SettingsScreen() {
         />
 
         <View style={{ gap: space.sm, marginTop: space.md }}>
+          <SectionTitle>Speltakken</SectionTitle>
+          <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+            Hoe jullie groep is opgedeeld: loodsenploeg, stam, bestuur, wat er ook is. Je hangt er
+            hieronder vaste namen aan, en bij een nieuwe avond vink je dan in één tik een hele
+            speltak aan in plaats van iedereen. Een speltak weghalen laat de namen staan.
+          </Text>
+
+          {sections.length === 0 ? (
+            <EmptyState title="Nog geen speltakken" />
+          ) : (
+            sections.map((section) => {
+              const count = defaultPeople.filter(
+                (person) => person.sectionId === section.id
+              ).length;
+              return (
+                <Card key={section.id} style={{ paddingVertical: space.md }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>
+                        {section.name}
+                      </Text>
+                      <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 2 }}>
+                        {count === 1 ? '1 naam' : `${count} namen`}
+                      </Text>
+                    </View>
+                    <Pressable onPress={() => setRenamingSection(section)} hitSlop={8}>
+                      <Text style={{ color: theme.link, fontWeight: '600' }}>Hernoemen</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() =>
+                        Alert.alert(
+                          `${section.name} verwijderen?`,
+                          'De namen blijven in de vaste lijst staan; ze horen daarna bij geen speltak meer.',
+                          [
+                            { text: 'Annuleren', style: 'cancel' },
+                            {
+                              text: 'Verwijderen',
+                              style: 'destructive',
+                              onPress: () => removeSection(section.id),
+                            },
+                          ]
+                        )
+                      }
+                      hitSlop={8}>
+                      <Text style={{ color: theme.danger, fontWeight: '600' }}>Verwijderen</Text>
+                    </Pressable>
+                  </View>
+                </Card>
+              );
+            })
+          )}
+
+          <Button
+            title="Speltak toevoegen"
+            variant="secondary"
+            onPress={() => setAddingSection(true)}
+          />
+        </View>
+
+        <View style={{ gap: space.sm, marginTop: space.md }}>
           <SectionTitle>Vaste namen</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-            De mensen die er meestal zijn. Bij een evenement voeg je ze in één keer toe, zodat je
-            ze niet elke keer opnieuw hoeft in te typen. Wie er die avond niet is, haal je daarna
-            gewoon weg.
+            De mensen die er meestal zijn, zodat je ze niet elke keer opnieuw hoeft in te typen.
+            Onder Beheer van een lijst kies je wie er die avond bij komt: een hele speltak, of
+            naam voor naam.
           </Text>
 
           {defaultPeople.length === 0 ? (
@@ -147,9 +217,22 @@ export default function SettingsScreen() {
             defaultPeople.map((person) => (
               <Card key={person.id} style={{ paddingVertical: space.md }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-                  <Text style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '600' }}>
-                    {person.name}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>
+                      {person.name}
+                    </Text>
+                    {/* Zonder speltakken valt er niets te kiezen, en dan is een
+                        knop die alleen een leeg venster opent erger dan geen
+                        knop. De uitleg erboven zegt waar ze vandaan komen. */}
+                    {sections.length > 0 ? (
+                      <Pressable onPress={() => setSectioningPerson(person)} hitSlop={6}>
+                        <Text style={{ color: theme.link, fontSize: 12, marginTop: 2 }}>
+                          {sections.find((section) => section.id === person.sectionId)?.name ??
+                            'Geen speltak'}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
                   <Pressable onPress={() => setRenamingPerson(person)} hitSlop={8}>
                     <Text style={{ color: theme.link, fontWeight: '600' }}>Hernoemen</Text>
                   </Pressable>
@@ -305,6 +388,41 @@ export default function SettingsScreen() {
           {versionLine()}
         </Text>
       </ScrollView>
+
+      <PromptModal
+        visible={addingSection}
+        title="Speltak toevoegen"
+        placeholder="bijv. Loodsenploeg"
+        submitLabel="Toevoegen"
+        onCancel={() => setAddingSection(false)}
+        onSubmit={(name) => {
+          addSection(name);
+          setAddingSection(false);
+        }}
+      />
+
+      <PromptModal
+        visible={renamingSection !== null}
+        title="Speltak hernoemen"
+        initialValue={renamingSection?.name ?? ''}
+        onCancel={() => setRenamingSection(null)}
+        onSubmit={(name) => {
+          if (renamingSection) renameSection(renamingSection.id, name);
+          setRenamingSection(null);
+        }}
+      />
+
+      <SectionPickerModal
+        visible={sectioningPerson !== null}
+        title={sectioningPerson ? `Speltak van ${sectioningPerson.name}` : 'Speltak'}
+        sections={sections}
+        value={sectioningPerson?.sectionId ?? null}
+        onCancel={() => setSectioningPerson(null)}
+        onSubmit={(sectionId) => {
+          if (sectioningPerson) setDefaultPersonSection(sectioningPerson.id, sectionId);
+          setSectioningPerson(null);
+        }}
+      />
 
       <PromptModal
         visible={addingPerson}

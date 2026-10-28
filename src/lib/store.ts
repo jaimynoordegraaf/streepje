@@ -21,6 +21,7 @@ import type {
   Person,
   PinRecord,
   SavedPerson,
+  Section,
   ShareInfo,
 } from './types';
 
@@ -132,6 +133,13 @@ type StoreState = {
    * them in again each time is the slowest part of setting an event up.
    */
   defaultPeople: SavedPerson[];
+  /**
+   * De speltakken waarin de vaste namen zijn opgedeeld: loodsen, stam,
+   * bestuur, wat de groep ook heeft. Zelf te benoemen, want geen twee
+   * scoutinggroepen zijn hetzelfde opgeknipt. Zie `Section` in types.ts voor
+   * waarom het geen "groep" heet.
+   */
+  sections: Section[];
 
   createEvent: (name: string, kind?: ListKind) => string;
   /**
@@ -192,9 +200,21 @@ type StoreState = {
   /** Log an order (delta 1) or a correction (delta -1). Always appends. */
   addOrder: (eventId: string, personId: string, itemId: string, delta: number) => void;
 
-  addDefaultPerson: (name: string) => void;
+  addDefaultPerson: (name: string, sectionId?: string | null) => void;
   renameDefaultPerson: (personId: string, name: string) => void;
   removeDefaultPerson: (personId: string) => void;
+  /** Zet de speltak van een vaste naam, of haal hem er met null weer af. */
+  setDefaultPersonSection: (personId: string, sectionId: string | null) => void;
+
+  /** Nieuwe speltak. Een naam die al bestaat levert er geen tweede op. */
+  addSection: (name: string) => void;
+  renameSection: (sectionId: string, name: string) => void;
+  /**
+   * Haalt een speltak weg. De namen die erbij hoorden blijven staan en horen
+   * daarna bij geen speltak meer -- een speltak opheffen mag nooit mensen uit
+   * de vaste lijst meenemen.
+   */
+  removeSection: (sectionId: string) => void;
 
   addDefaultItem: (draft: Omit<MenuItem, 'id'>) => void;
   updateDefaultItem: (itemId: string, patch: Partial<Omit<MenuItem, 'id'>>) => void;
@@ -251,6 +271,7 @@ export const useStore = create<StoreState>()(
       events: [],
       defaultMenu: withIds(STARTER_MENU),
       defaultPeople: [],
+      sections: [],
 
       createEvent: (name, kind = 'event') => {
         const id = newId();
@@ -577,9 +598,12 @@ export const useStore = create<StoreState>()(
           }),
         }),
 
-      addDefaultPerson: (name) =>
+      addDefaultPerson: (name, sectionId = null) =>
         set({
-          defaultPeople: [...get().defaultPeople, { id: newId(), name: name.trim() || 'Iemand' }],
+          defaultPeople: [
+            ...get().defaultPeople,
+            { id: newId(), name: name.trim() || 'Iemand', sectionId },
+          ],
         }),
 
       renameDefaultPerson: (personId, name) =>
@@ -591,6 +615,41 @@ export const useStore = create<StoreState>()(
 
       removeDefaultPerson: (personId) =>
         set({ defaultPeople: get().defaultPeople.filter((person) => person.id !== personId) }),
+
+      setDefaultPersonSection: (personId, sectionId) =>
+        set({
+          defaultPeople: get().defaultPeople.map((person) =>
+            person.id === personId ? { ...person, sectionId } : person
+          ),
+        }),
+
+      addSection: (name) => {
+        const trimmed = name.trim();
+        if (trimmed === '') return;
+        // Twee speltakken met dezelfde naam geven twee chips die niet van
+        // elkaar te onderscheiden zijn, en dan is niet te zien welke de helft
+        // van de namen heeft.
+        const exists = get().sections.some(
+          (section) => section.name.toLowerCase() === trimmed.toLowerCase()
+        );
+        if (exists) return;
+        set({ sections: [...get().sections, { id: newId(), name: trimmed }] });
+      },
+
+      renameSection: (sectionId, name) =>
+        set({
+          sections: get().sections.map((section) =>
+            section.id === sectionId ? { ...section, name: name.trim() || section.name } : section
+          ),
+        }),
+
+      removeSection: (sectionId) =>
+        set({
+          sections: get().sections.filter((section) => section.id !== sectionId),
+          defaultPeople: get().defaultPeople.map((person) =>
+            person.sectionId === sectionId ? { ...person, sectionId: null } : person
+          ),
+        }),
 
       addDefaultItem: (draft) =>
         set({ defaultMenu: [...get().defaultMenu, { ...draft, id: newId() }] }),
@@ -726,7 +785,7 @@ export const useStore = create<StoreState>()(
         ...state,
         events: state.events.filter((event) => !event.demo),
       }),
-      version: 12,
+      version: 13,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -919,6 +978,19 @@ export const useStore = create<StoreState>()(
           // app al gebruikte, dus die krijgt hem niet alsnog voor zijn kiezen;
           // onder Instellingen staat hij klaar voor wie hem wel wil zien.
           state.tourSeen = true;
+        }
+
+        if (fromVersion < 13) {
+          // Vaste namen kunnen bij een speltak gaan horen, zodat je bij een
+          // nieuwe avond per speltak kunt kiezen wie er bij komt. Wie er al
+          // stond hoort nog bij geen enkele: die blijft gewoon in de lijst
+          // staan en is te vinden onder "Alles" en "Zonder speltak". De
+          // beheerder hangt ze er onder Instellingen zelf aan.
+          state.sections = state.sections ?? [];
+          state.defaultPeople = (state.defaultPeople ?? []).map((person: SavedPerson) => ({
+            ...person,
+            sectionId: person.sectionId ?? null,
+          }));
         }
 
         return state;

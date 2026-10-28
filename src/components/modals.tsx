@@ -18,6 +18,8 @@ import type {
   ListKind,
   MenuItem,
   Person,
+  SavedPerson,
+  Section,
 } from '@/lib/types';
 import { radius, space, useTheme } from '@/theme';
 
@@ -693,6 +695,279 @@ export function MemberPickerModal({
             />
           ) : null}
         </View>
+      </Backdrop>
+    </Modal>
+  );
+}
+
+/**
+ * Kiezen welke vaste namen er bij deze lijst komen, met een filter per
+ * speltak.
+ *
+ * Dit ging eerst in een keer: alle vaste namen erin, en wie er die avond niet
+ * was haalde je daarna weg. Achter de bar is dat de verkeerde kant op. Iemand
+ * weghalen kan alleen op een beheertelefoon en alleen met de correctiecode,
+ * terwijl iemand erbij zetten een tik is -- te veel toevoegen kost dus meer
+ * dan te weinig. Daarom staat er niets aangevinkt als dit venster opengaat,
+ * en kiest de beheerder zelf: een hele speltak in een tik, of naam voor naam.
+ */
+export function SavedPeoplePickerModal({
+  visible,
+  people,
+  sections,
+  alreadyIn,
+  onCancel,
+  onSubmit,
+}: {
+  visible: boolean;
+  /** De vaste lijst, zoals hij onder Instellingen staat. */
+  people: SavedPerson[];
+  sections: Section[];
+  /** Namen die al in de lijst staan. Vergelijken gaat zonder hoofdletters. */
+  alreadyIn: string[];
+  onCancel: () => void;
+  onSubmit: (names: string[]) => void;
+}) {
+  const theme = useTheme();
+  // 'alles', 'zonder', of 'speltak:<id>'. De voorvoegsels houden de drie
+  // soorten uit elkaar, zodat een speltak die "zonder" heet niets verwart.
+  const [filter, setFilter] = useState('alles');
+  const [chosen, setChosen] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!visible) return;
+    setFilter('alles');
+    setChosen([]);
+  }, [visible]);
+
+  if (!visible) return null;
+
+  const taken = new Set(alreadyIn.map((name) => name.toLowerCase()));
+  const sorted = [...people].sort((a, b) => a.name.localeCompare(b.name, 'nl'));
+  const sectionName = (sectionId: string | null | undefined) =>
+    sections.find((section) => section.id === sectionId)?.name ?? null;
+
+  /** Iedereen die nog toegevoegd kan worden, los van het filter. */
+  const available = sorted.filter((person) => !taken.has(person.name.toLowerCase()));
+  const matches = (person: SavedPerson) => {
+    if (filter === 'alles') return true;
+    if (filter === 'zonder') return sectionName(person.sectionId) === null;
+    return 'speltak:' + person.sectionId === filter;
+  };
+
+  const shown = sorted.filter(matches);
+  const shownAvailable = shown.filter((person) => !taken.has(person.name.toLowerCase()));
+  const allShownChosen =
+    shownAvailable.length > 0 && shownAvailable.every((person) => chosen.includes(person.id));
+
+  // Alleen de speltakken die iemand hebben: een lege chip is een knop die
+  // niets doet. "Zonder speltak" komt er alleen bij als er zulke namen zijn --
+  // op een telefoon die net heeft bijgewerkt is dat iedereen, en dan is die
+  // chip hetzelfde als Alles.
+  const used = sections.filter((section) =>
+    sorted.some((person) => person.sectionId === section.id)
+  );
+  const anyWithout = sorted.some((person) => sectionName(person.sectionId) === null);
+  const chips = [
+    { key: 'alles', label: 'Alles' },
+    ...used.map((section) => ({ key: 'speltak:' + section.id, label: section.name })),
+    ...(anyWithout && used.length > 0 ? [{ key: 'zonder', label: 'Zonder speltak' }] : []),
+  ];
+
+  const toggle = (personId: string) =>
+    setChosen((current) =>
+      current.includes(personId)
+        ? current.filter((candidate) => candidate !== personId)
+        : [...current, personId]
+    );
+
+  /** Zet aan of uit wat er nu staat; de keuze buiten het filter blijft staan. */
+  const toggleShown = () =>
+    setChosen((current) => {
+      const ids = shownAvailable.map((person) => person.id);
+      return allShownChosen
+        ? current.filter((candidate) => !ids.includes(candidate))
+        : [...current, ...ids.filter((id) => !current.includes(id))];
+    });
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <Backdrop onCancel={onCancel}>
+        <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>
+          Vaste namen toevoegen
+        </Text>
+
+        {available.length === 0 ? (
+          <Text style={{ color: theme.textDim, fontSize: 14, lineHeight: 20 }}>
+            {people.length === 0
+              ? 'Er staan nog geen vaste namen. Onder Instellingen zet je de mensen die er meestal zijn, en daar verdeel je ze ook over speltakken.'
+              : 'Iedereen uit de vaste lijst staat al in deze lijst.'}
+          </Text>
+        ) : (
+          <>
+            {chips.length > 1 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                {chips.map((chip) => {
+                  const selected = filter === chip.key;
+                  return (
+                    <Pressable
+                      key={chip.key}
+                      onPress={() => setFilter(chip.key)}
+                      style={{
+                        paddingVertical: 8,
+                        paddingHorizontal: space.md,
+                        borderRadius: radius.pill,
+                        backgroundColor: selected ? theme.accent : theme.chip,
+                      }}>
+                      <Text
+                        style={{
+                          color: selected ? theme.onAccent : theme.text,
+                          fontWeight: '600',
+                        }}>
+                        {chip.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+              <Text style={{ flex: 1, color: theme.textDim, fontSize: 13, fontWeight: '600' }}>
+                {chosen.length} van {available.length} gekozen
+              </Text>
+              {shownAvailable.length > 0 ? (
+                <Pressable onPress={toggleShown} hitSlop={8}>
+                  <Text style={{ color: theme.link, fontWeight: '600' }}>
+                    {allShownChosen ? 'Niemand' : filter === 'alles' ? 'Iedereen' : 'Alles hier'}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ gap: space.xs }}>
+              {shown.length === 0 ? (
+                <Text style={{ color: theme.textDim, fontSize: 14 }}>Niemand in deze speltak.</Text>
+              ) : null}
+              {shown.map((person) => {
+                const inList = taken.has(person.name.toLowerCase());
+                const selected = chosen.includes(person.id);
+                const speltak = sectionName(person.sectionId);
+                return (
+                  <Pressable
+                    key={person.id}
+                    disabled={inList}
+                    onPress={() => toggle(person.id)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: space.sm,
+                      paddingVertical: 10,
+                      paddingHorizontal: space.sm,
+                      borderRadius: radius.md,
+                      backgroundColor: selected ? theme.chip : 'transparent',
+                      opacity: inList ? 0.45 : 1,
+                    }}>
+                    <View style={{ width: 24, alignItems: 'center' }}>
+                      {selected ? <CheckIcon size={20} color={theme.accent} /> : null}
+                    </View>
+                    <Text style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '600' }}>
+                      {person.name}
+                    </Text>
+                    {inList ? (
+                      <Text style={{ color: theme.textDim, fontSize: 12 }}>al toegevoegd</Text>
+                    ) : filter === 'alles' && speltak ? (
+                      <Text style={{ color: theme.textDim, fontSize: 12 }}>{speltak}</Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </>
+        )}
+
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Button
+            title={available.length === 0 ? 'Sluiten' : 'Annuleren'}
+            variant="secondary"
+            onPress={onCancel}
+            style={{ flex: 1 }}
+          />
+          {available.length > 0 ? (
+            <Button
+              title={chosen.length === 0 ? 'Toevoegen' : chosen.length + ' toevoegen'}
+              disabled={chosen.length === 0}
+              onPress={() =>
+                onSubmit(
+                  sorted.filter((person) => chosen.includes(person.id)).map((person) => person.name)
+                )
+              }
+              style={{ flex: 1 }}
+            />
+          ) : null}
+        </View>
+      </Backdrop>
+    </Modal>
+  );
+}
+
+/**
+ * De speltak van een vaste naam kiezen. Een tik is de keuze: er is verder
+ * niets te vragen, en een Opslaan erbij zou alleen een tik kosten.
+ */
+export function SectionPickerModal({
+  visible,
+  title,
+  sections,
+  value,
+  onCancel,
+  onSubmit,
+}: {
+  visible: boolean;
+  title: string;
+  sections: Section[];
+  /** De speltak die er nu op staat, of null. */
+  value: string | null | undefined;
+  onCancel: () => void;
+  onSubmit: (sectionId: string | null) => void;
+}) {
+  const theme = useTheme();
+  if (!visible) return null;
+
+  const options: { id: string | null; name: string }[] = [
+    ...sections.map((section) => ({ id: section.id, name: section.name })),
+    { id: null, name: 'Geen speltak' },
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <Backdrop onCancel={onCancel}>
+        <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>{title}</Text>
+        <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={{ gap: space.sm }}>
+          {options.map((option) => {
+            const selected = (value ?? null) === option.id;
+            return (
+              <Pressable
+                key={option.id ?? 'geen'}
+                onPress={() => onSubmit(option.id)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: space.sm,
+                  paddingVertical: 14,
+                  paddingHorizontal: space.md,
+                  borderRadius: radius.md,
+                  backgroundColor: theme.chip,
+                }}>
+                <View style={{ width: 24, alignItems: 'center' }}>
+                  {selected ? <CheckIcon size={20} color={theme.accent} /> : null}
+                </View>
+                <Text style={{ flex: 1, color: theme.text, fontWeight: '600' }}>{option.name}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <Button title="Annuleren" variant="secondary" onPress={onCancel} />
       </Backdrop>
     </Modal>
   );

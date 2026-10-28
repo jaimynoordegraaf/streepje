@@ -37,10 +37,34 @@ export type MenuItem = {
   hidden?: boolean;
 };
 
+/**
+ * Een speltak: het stuk van de groep waar een vaste naam bij hoort.
+ *
+ * Let op het woord. "Groep" is in deze app al bezet -- dat is de barploeg die
+ * samen lijsten deelt (zie `group` in store.ts) -- en in Scouting is de groep
+ * ook juist het geheel en niet een deel ervan. Een speltak is wel het deel:
+ * loodsen, stam, bestuur, welpen. De namen typt de beheerder zelf, want elke
+ * groep knipt zich anders op; een vaste lijst in de code zou bij de eerste
+ * groep die hem gebruikt al niet kloppen.
+ *
+ * Een speltak hoort bij de vaste namen op deze telefoon en gaat nooit mee naar
+ * de server: hij helpt alleen bij het kiezen wie er die avond bij komt.
+ */
+export type Section = {
+  id: string;
+  name: string;
+};
+
 /** A name kept between events, so the same crew is not retyped every time. */
 export type SavedPerson = {
   id: string;
   name: string;
+  /**
+   * De speltak van deze naam, als die bekend is. Null of afwezig betekent: bij
+   * geen enkele -- zo staat iedereen erin die er al stond voordat speltakken
+   * bestonden. Verwijst naar `Section.id`.
+   */
+  sectionId?: string | null;
 };
 
 /** Someone attending an event. */
