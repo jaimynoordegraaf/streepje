@@ -229,4 +229,15 @@ export type AppEvent = {
    * the database -- to hold a copy.
    */
   correctionPin: PinRecord | null;
+  /**
+   * De voorbeeldlijst van de rondleiding, en verder niets.
+   *
+   * Hij bestaat alleen zolang de rondleiding loopt, zodat die de echte schermen
+   * kan laten zien in plaats van tekeningen ervan. Twee dingen hangen eraan: de
+   * opslag laat hem vallen (zie `partialize` in store.ts), en het beginscherm
+   * ruimt hem op zodra er geen rondleiding meer loopt. Delen gebeurt nooit --
+   * een lijst gaat pas naar de server als `share` gezet wordt, en dat gebeurt
+   * alleen op het Delen-scherm en bij een nieuwe lijst van iemand met een groep.
+   */
+  demo?: boolean;
 };

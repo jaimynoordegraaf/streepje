@@ -4,6 +4,7 @@ import { Alert, SectionList, View } from 'react-native';
 
 import { CheckIcon, CrossIcon } from '@/components/icons';
 import { PinModal } from '@/components/pin-modal';
+import { TourTarget } from '@/components/tour';
 import { Text } from '@/components/text';
 import {
   Card,
@@ -22,6 +23,7 @@ import {
   unlockCorrections,
 } from '@/lib/pin';
 import { useEvent, useStore } from '@/lib/store';
+import { ANCHOR } from '@/lib/tour';
 import { activeMenu, itemCents, personItemCount, personTotalCents, quantities } from '@/lib/totals';
 import type { MenuItem } from '@/lib/types';
 import { space, useTheme } from '@/theme';
@@ -102,9 +104,14 @@ export default function PersonScreen() {
     setAsking(null);
   };
 
+  // Waar de rondleiding turven en corrigeren op laat zien: het eerste item
+  // van het menu, dat bovenaan het eerste blok staat.
+  const firstItemId = sections[0]?.data[0]?.id;
+
   const renderItem = ({ item }: { item: MenuItem }) => {
     const quantity = Math.max(0, counts[item.id] ?? 0);
-    return (
+    const shown = item.id === firstItemId;
+    const card = (
       <Card style={{ paddingVertical: space.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
           <View style={{ flex: 1 }}>
@@ -117,6 +124,7 @@ export default function PersonScreen() {
 
           <StepButton
             icon={(color, size) => <CrossIcon size={size} color={color} />}
+            tourId={shown ? ANCHOR.correction : undefined}
             onPress={() => requestRemoval(item)}
             disabled={event.closed || quantity === 0}
           />
@@ -140,6 +148,7 @@ export default function PersonScreen() {
         </View>
       </Card>
     );
+    return shown ? <TourTarget id={ANCHOR.item}>{card}</TourTarget> : card;
   };
 
   return (

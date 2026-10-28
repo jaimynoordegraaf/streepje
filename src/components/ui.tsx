@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from './text';
 
+import { useAnchor } from '@/lib/tour';
 import { font, radius, space, useTheme } from '@/theme';
 
 /**
@@ -27,7 +28,7 @@ import { font, radius, space, useTheme } from '@/theme';
  * hand's width of nothing between them. A column you can read in one glance
  * beats filling the glass.
  */
-const contentMaxWidth = 640;
+export const contentMaxWidth = 640;
 
 export function Screen({
   children,
@@ -139,6 +140,7 @@ export function Button({
   disabled = false,
   style,
   icon,
+  tourId,
 }: {
   title: string;
   onPress: () => void;
@@ -147,8 +149,14 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   /** Given the label colour, so the icon always matches the text beside it. */
   icon?: (color: string, size: number) => ReactNode;
+  /**
+   * Meldt deze knop aan bij de rondleiding, zodat die hem kan aanwijzen. Zie
+   * lib/tour.ts; weglaten kost niets.
+   */
+  tourId?: string;
 }) {
   const theme = useTheme();
+  const anchor = useAnchor(tourId);
   const background =
     variant === 'primary' ? theme.accent : variant === 'danger' ? theme.danger : theme.chip;
   const color =
@@ -156,6 +164,9 @@ export function Button({
 
   return (
     <Pressable
+      ref={anchor.ref}
+      onLayout={anchor.onLayout}
+      collapsable={false}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
@@ -194,16 +205,23 @@ export function StepButton({
   onPress,
   tone = 'neutral',
   disabled = false,
+  tourId,
 }: {
   /** Given the resolved foreground colour, so it reads on either tone. */
   icon: (color: string, size: number) => ReactNode;
   onPress: () => void;
   tone?: 'neutral' | 'accent';
   disabled?: boolean;
+  /** Zie Button hierboven. */
+  tourId?: string;
 }) {
   const theme = useTheme();
+  const anchor = useAnchor(tourId);
   return (
     <Pressable
+      ref={anchor.ref}
+      onLayout={anchor.onLayout}
+      collapsable={false}
       onPress={onPress}
       disabled={disabled}
       hitSlop={6}

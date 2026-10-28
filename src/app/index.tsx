@@ -1,15 +1,17 @@
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/text';
 
 import { NewListModal } from '@/components/modals';
+import { TourTarget } from '@/components/tour';
 import { BottomBar, Button, Card, EmptyState, HeaderButton, Screen } from '@/components/ui';
 import { describeError } from '@/lib/errors';
 import { formatDate } from '@/lib/export';
 import { formatCents } from '@/lib/money';
 import { newJoinCode, useStore } from '@/lib/store';
+import { ANCHOR, useStartTour, useTour } from '@/lib/tour';
 import { isSyncConfigured } from '@/lib/supabase';
 import {
   attachToGroup,
@@ -100,11 +102,41 @@ export default function EventsScreen() {
   const events = useStore((state) => state.events);
   const createEvent = useStore((state) => state.createEvent);
   const group = useStore((state) => state.group);
+  const tourSeen = useStore((state) => state.tourSeen);
+  const removeDemoEvents = useStore((state) => state.removeDemoEvents);
+  const hasDemo = useStore((state) => state.events.some((event) => event.demo));
+  const tourActive = useTour((state) => state.active);
+  const startTour = useStartTour();
   const adoptRemoteEvent = useStore((state) => state.adoptRemoteEvent);
   const setShare = useStore((state) => state.setShare);
   const setEventGroup = useStore((state) => state.setEventGroup);
   const [creating, setCreating] = useState(false);
   const [fetchingGroup, setFetchingGroup] = useState(false);
+
+  /**
+   * De rondleiding, de eerste keer dat de app opengaat.
+   *
+   * Vanaf hier en niet vanuit de wortel van de app: dit is het eerste scherm
+   * dat er staat, dus de navigatie is klaar om ernaartoe te varen. De vlag
+   * gaat pas om als de rondleiding klaar is, dus wie halverwege wegdrukt
+   * krijgt hem de volgende keer nog een keer.
+   */
+  useEffect(() => {
+    if (!tourSeen) startTour();
+  }, [tourSeen, startTour]);
+
+  /**
+   * De voorbeeldlijst van de rondleiding opruimen.
+   *
+   * Hier, omdat de rondleiding hier eindigt en dit scherm dus toch in beeld
+   * komt: opruimen terwijl een scherm van die lijst nog staat zou dat scherm
+   * "bestaat niet meer" laten zeggen. Het is meteen het vangnet -- blijft er
+   * ooit een voorbeeldlijst achter, dan is hij bij het eerstvolgende bezoek
+   * aan het beginscherm alsnog weg.
+   */
+  useEffect(() => {
+    if (!tourActive && hasDemo) removeDemoEvents();
+  }, [tourActive, hasDemo, removeDemoEvents]);
 
   /**
    * Lijsten van de groep ophalen die nog niet op deze telefoon staan.
@@ -232,12 +264,18 @@ export default function EventsScreen() {
             hint="Maak een lopende rekening voor de gewone baravonden, of een evenement voor een feest of een weekend weg, en begin met turven."
           />
         }
-        renderItem={({ item }) => (
-          <EventRow
-            event={item}
-            onPress={() => router.push({ pathname: '/event/[id]', params: { id: item.id } })}
-          />
-        )}
+        renderItem={({ item, index }) => {
+          const row = (
+            <EventRow
+              event={item}
+              onPress={() => router.push({ pathname: '/event/[id]', params: { id: item.id } })}
+            />
+          );
+          // De rondleiding wijst de bovenste lijst aan, en dat is tijdens de
+          // rondleiding de voorbeeldlijst: die is net aangemaakt en staat dus
+          // vooraan.
+          return index === 0 ? <TourTarget id={ANCHOR.list}>{row}</TourTarget> : row;
+        }}
       />
 
       <NewListModal

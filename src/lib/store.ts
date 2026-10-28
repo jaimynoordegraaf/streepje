@@ -116,6 +116,14 @@ type StoreState = {
    * halen -- wie er lid is en wat je mag, weet de database.
    */
   group: { id: string; name: string; joinCode: string } | null;
+  /**
+   * Of de rondleiding al een keer voorbij is gekomen.
+   *
+   * Hij hoort bij de telefoon en niet bij een lijst, dus hij staat hier en niet
+   * in een eigen sleutel: zo reist hij mee met de rest van wat bewaard wordt en
+   * is er maar één plek die hem kan vergeten.
+   */
+  tourSeen: boolean;
   events: AppEvent[];
   /** The menu that newly created events start from. */
   defaultMenu: MenuItem[];
@@ -126,6 +134,14 @@ type StoreState = {
   defaultPeople: SavedPerson[];
 
   createEvent: (name: string, kind?: ListKind) => string;
+  /**
+   * De voorbeeldlijst voor de rondleiding: een avond met drie namen en een
+   * paar turfjes erop, zodat de echte schermen iets te laten zien hebben.
+   * Geeft de ids terug die de rondleiding nodig heeft om ernaartoe te varen.
+   */
+  createDemoEvent: () => { eventId: string; personId: string };
+  /** Haalt elke voorbeeldlijst weg. Veilig als er geen is. */
+  removeDemoEvents: () => void;
   renameEvent: (eventId: string, name: string) => void;
   deleteEvent: (eventId: string) => void;
   setEventClosed: (eventId: string, closed: boolean) => void;
@@ -184,6 +200,9 @@ type StoreState = {
   updateDefaultItem: (itemId: string, patch: Partial<Omit<MenuItem, 'id'>>) => void;
   removeDefaultItem: (itemId: string) => void;
 
+  /** Onthoud dat de rondleiding is langsgekomen, of zet hem weer open. */
+  setTourSeen: (seen: boolean) => void;
+
   // --- used by the sync engine -------------------------------------------
 
   setDeviceName: (name: string) => void;
@@ -228,6 +247,7 @@ export const useStore = create<StoreState>()(
       deviceId: newId(),
       deviceName: null,
       group: null,
+      tourSeen: false,
       events: [],
       defaultMenu: withIds(STARTER_MENU),
       defaultPeople: [],
@@ -252,6 +272,74 @@ export const useStore = create<StoreState>()(
         };
         set({ events: [event, ...get().events] });
         return id;
+      },
+
+      createDemoEvent: () => {
+        const menu = get().defaultMenu.map((item) => ({ ...item, id: newId() }));
+        const people = ['Sanne', 'Joost', 'Imke'].map((name) => ({
+          id: newId(),
+          name,
+          paidCents: 0,
+          paidAt: null,
+          removedAt: null,
+          removedBy: null,
+          memberId: null,
+          billing: 'tonight' as Billing,
+          guestOf: null,
+        }));
+
+        // Een paar turfjes, want een rondleiding langs een lijst waar overal
+        // nul staat laat juist niet zien wat de app doet. Op het eerste
+        // drankje van het menu, en in de tijd uit elkaar getrokken zodat het
+        // logboek er ook als een avond uitziet.
+        const drink = menu.find((item) => item.category === 'drink') ?? menu[0];
+        const entries: OrderEntry[] = [];
+        const now = Date.now();
+        people.forEach((person, index) => {
+          for (let turf = 0; turf < [3, 1, 2][index]; turf++) {
+            entries.push({
+              id: newId(),
+              personId: person.id,
+              itemId: drink.id,
+              delta: 1,
+              deviceId: get().deviceId,
+              // Een verse telefoon heeft nog geen naam, en dan zou het logboek
+              // "telefoon onbekend" tonen bij juist de stap die uitlegt dat je
+              // ziet van welke telefoon een turf kwam. De hele lijst is
+              // verzonnen, dus deze naam mag dat ook zijn.
+              deviceName: get().deviceName ?? 'Bar',
+              priceCents: drink.priceCents,
+              createdAt: now - (index * 3 + turf) * 7 * 60 * 1000,
+            });
+          }
+        });
+
+        const event: AppEvent = {
+          id: newId(),
+          name: 'Voorbeeldavond',
+          kind: 'event',
+          createdAt: now,
+          people,
+          menu,
+          entries,
+          unsyncedEntryIds: [],
+          closed: false,
+          groupId: null,
+          share: null,
+          correctionPin: null,
+          demo: true,
+        };
+        // Een eventuele vorige voorbeeldlijst gaat eraf, zodat er nooit
+        // twee kunnen staan.
+        set({ events: [event, ...get().events.filter((other) => !other.demo)] });
+        return { eventId: event.id, personId: people[0].id };
+      },
+
+      removeDemoEvents: () => {
+        const left = get().events.filter((event) => !event.demo);
+        // Niets schrijven als er niets te halen valt, anders zou het
+        // beginscherm zichzelf bij elke render opnieuw aan het werk zetten.
+        if (left.length !== get().events.length) set({ events: left });
       },
 
       renameEvent: (eventId, name) =>
@@ -517,6 +605,8 @@ export const useStore = create<StoreState>()(
       removeDefaultItem: (itemId) =>
         set({ defaultMenu: get().defaultMenu.filter((item) => item.id !== itemId) }),
 
+      setTourSeen: (seen) => set({ tourSeen: seen }),
+
       setDeviceName: (deviceName) => set({ deviceName: deviceName.trim() || null }),
 
       setGroup: (group) => set({ group }),
@@ -624,7 +714,19 @@ export const useStore = create<StoreState>()(
     {
       name: 'turf-store-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 11,
+      /**
+       * De voorbeeldlijst van de rondleiding gaat niet mee de opslag in.
+       *
+       * Hem er helemaal buiten houden is sterker dan hem achteraf opruimen:
+       * wordt de app halverwege de rondleiding weggedrukt, dan is hij bij de
+       * volgende start gewoon weg, zonder dat daar iets voor hoeft te draaien
+       * dat zelf ook kan falen. De rest van de staat gaat zoals altijd mee.
+       */
+      partialize: (state) => ({
+        ...state,
+        events: state.events.filter((event) => !event.demo),
+      }),
+      version: 12,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -809,6 +911,14 @@ export const useStore = create<StoreState>()(
             ...event,
             menu: label(event.menu),
           }));
+        }
+
+        if (fromVersion < 12) {
+          // De rondleiding komt erbij, en die is bedoeld voor wie de app nieuw
+          // heeft. Dat er iets te migreren viel betekent dat deze telefoon de
+          // app al gebruikte, dus die krijgt hem niet alsnog voor zijn kiezen;
+          // onder Instellingen staat hij klaar voor wie hem wel wil zien.
+          state.tourSeen = true;
         }
 
         return state;

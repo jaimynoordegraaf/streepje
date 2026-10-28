@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/text';
@@ -20,6 +20,8 @@ import { parsePrice } from '@/lib/money';
 import { formatCents } from '@/lib/money';
 import { isAdminDevice } from '@/lib/pin';
 import { useEvent, useStore } from '@/lib/store';
+import { ANCHOR, useTourFocus } from '@/lib/tour';
+import { TourTarget } from '@/components/tour';
 import type { Person } from '@/lib/types';
 import {
   activePeople,
@@ -45,6 +47,32 @@ export default function TotalsScreen() {
   const event = useEvent(id);
   const setPersonPayment = useStore((state) => state.setPersonPayment);
   const [payingPerson, setPayingPerson] = useState<Person | null>(null);
+  const list = useRef<FlatList<Person>>(null);
+
+  /**
+   * De exportknoppen staan onder de namen, dus bij een lijst met een paar
+   * mensen erop staan ze buiten beeld. De rondleiding kan niet wijzen naar wat
+   * er niet staat, dus bij die stap schuift het scherm er zelf naartoe.
+   * Zonder animatie, want de rondleiding meet kort daarna waar de knoppen
+   * staan en een lopende beweging geeft dan de verkeerde plek.
+   */
+  const showingExports = useTourFocus(ANCHOR.exports);
+  useEffect(() => {
+    if (!showingExports) return;
+    // Een offset die groter is dan de lijst ooit wordt; verder dan de bodem
+    // schuift hij niet. Met opzet niet scrollToEnd: die rekent met de
+    // inhoudshoogte die de lijst zelf bijhoudt, en zolang de voet met de
+    // knoppen nog niet gemeten is blijft hij staan waar hij staat.
+    const toBottom = () => list.current?.scrollToOffset({ offset: 100000, animated: false });
+    // Twee keer, want de eerste keer komt de lijst net van een ander scherm en
+    // is de voet met de exportknoppen nog niet opgebouwd.
+    const soon = setTimeout(toBottom, 60);
+    const later = setTimeout(toBottom, 320);
+    return () => {
+      clearTimeout(soon);
+      clearTimeout(later);
+    };
+  }, [showingExports]);
   const deviceId = useStore((state) => state.deviceId);
   const deviceName = useStore((state) => state.deviceName);
   const [busy, setBusy] = useState(false);
@@ -95,6 +123,7 @@ export default function TotalsScreen() {
       <Stack.Screen options={{ title: 'Totalen' }} />
 
       <FlatList
+        ref={list}
         data={activePeople(event)}
         keyExtractor={(person) => person.id}
         contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: space.xxl + bottomInset }}
@@ -154,7 +183,7 @@ export default function TotalsScreen() {
                 </Text>
               ) : null}
 
-              <View style={{ gap: space.sm, marginTop: space.md }}>
+              <TourTarget id={ANCHOR.exports} style={{ gap: space.sm, marginTop: space.md }}>
                 <Button
                   title={busy ? 'Bezig…' : 'CSV-bestand exporteren'}
                   disabled={busy}
@@ -184,7 +213,7 @@ export default function TotalsScreen() {
                     setChoosingPeriod(true);
                   }}
                 />
-              </View>
+              </TourTarget>
             </Card>
             </>
           ) : null

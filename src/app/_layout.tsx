@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, View, useColorScheme } from 'react-native
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BackIcon } from '@/components/icons';
+import { TourOverlay } from '@/components/tour';
 import { useStore } from '@/lib/store';
 import { font, space, type as typeScale, useTheme } from '@/theme';
 
@@ -102,25 +103,30 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style={dark ? 'light' : 'dark'} />
       <ThemeProvider value={navigationTheme}>
-        <Stack
-          screenOptions={({ navigation }) => ({
-            headerStyle: { backgroundColor: theme.card },
-            headerTintColor: theme.text,
-            // Bold italic, matching the logotype.
-            headerTitleStyle: {
-              color: theme.text,
-              fontFamily: font.displayItalic,
-              fontSize: typeScale.title,
-            },
-            contentStyle: { backgroundColor: theme.background },
-            // A header left item only where there is somewhere to go back to.
-            // Having one that renders nothing is not the same as having none:
-            // from iOS 26 the bar still draws the Liquid Glass capsule meant to
-            // hold it, so the first screen showed an empty pill that could be
-            // tapped and did nothing.
-            headerLeft: navigation.canGoBack() ? () => <HeaderBack /> : undefined,
-          })}
-        />
+        {/* De rondleiding hangt naast de navigatie en niet erin, zodat hij
+            blijft staan terwijl hij zelf van scherm naar scherm vaart. */}
+        <View style={{ flex: 1 }}>
+          <Stack
+            screenOptions={({ navigation }) => ({
+              headerStyle: { backgroundColor: theme.card },
+              headerTintColor: theme.text,
+              // Bold italic, matching the logotype.
+              headerTitleStyle: {
+                color: theme.text,
+                fontFamily: font.displayItalic,
+                fontSize: typeScale.title,
+              },
+              contentStyle: { backgroundColor: theme.background },
+              // A header left item only where there is somewhere to go back to.
+              // Having one that renders nothing is not the same as having none:
+              // from iOS 26 the bar still draws the Liquid Glass capsule meant to
+              // hold it, so the first screen showed an empty pill that could be
+              // tapped and did nothing.
+              headerLeft: navigation.canGoBack() ? () => <HeaderBack /> : undefined,
+            })}
+          />
+          <TourOverlay />
+        </View>
       </ThemeProvider>
     </SafeAreaProvider>
   );

@@ -6,9 +6,11 @@ import { Text } from '@/components/text';
 
 import { CartIcon } from '@/components/icons';
 import { GuestModal, MemberPickerModal, PromptModal } from '@/components/modals';
+import { TourTarget } from '@/components/tour';
 import { BottomBar, Button, Card, EmptyState, HeaderButton, Screen } from '@/components/ui';
 import { formatCents } from '@/lib/money';
 import { useEvent, useStore } from '@/lib/store';
+import { ANCHOR } from '@/lib/tour';
 import { useEventSync, type SyncStatus } from '@/lib/use-sync';
 import {
   activePeople,
@@ -216,6 +218,7 @@ export default function EventScreen() {
         <BottomBar>
           <Button
             title="Rondje"
+            tourId={ANCHOR.round}
             variant="secondary"
             disabled={event.closed}
             onPress={() => router.push({ pathname: '/event/[id]/round', params: { id } })}
@@ -262,13 +265,15 @@ export default function EventScreen() {
               outstanding={eventOutstandingCents(event)}
               invoiced={eventInvoiceCents(event)}
             />
-            <ShareStrip
-              status={status}
-              pending={pending}
-              unsaved={detailsPending}
-              shared={Boolean(event.share)}
-              onPress={() => router.push({ pathname: '/event/[id]/share', params: { id } })}
-            />
+            <TourTarget id={ANCHOR.share}>
+              <ShareStrip
+                status={status}
+                pending={pending}
+                unsaved={detailsPending}
+                shared={Boolean(event.share)}
+                onPress={() => router.push({ pathname: '/event/[id]/share', params: { id } })}
+              />
+            </TourTarget>
           </View>
         }
         ListFooterComponent={
@@ -314,13 +319,13 @@ export default function EventScreen() {
             }
           />
         }
-        renderItem={({ item: person }) => {
+        renderItem={({ item: person, index }) => {
           const total = personTotalCents(event, person.id);
           const count = personItemCount(event, person.id);
           const host = nameOf(person.guestOf);
           // On a tab everyone is invoiced, so saying so on every row is noise.
           const invoiced = !tab && !paysTonight(event, person);
-          return (
+          const row = (
             <Pressable
               onPress={() =>
                 router.push({
@@ -355,6 +360,8 @@ export default function EventScreen() {
               </Card>
             </Pressable>
           );
+          // De rondleiding wijst de bovenste naam aan om turven op te laten zien.
+          return index === 0 ? <TourTarget id={ANCHOR.person}>{row}</TourTarget> : row;
         }}
       />
 

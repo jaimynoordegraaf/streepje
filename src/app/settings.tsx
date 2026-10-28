@@ -9,6 +9,7 @@ import { PromptModal } from '@/components/modals';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { describeError } from '@/lib/errors';
 import { newId, newJoinCode, useStore } from '@/lib/store';
+import { useStartTour } from '@/lib/tour';
 import { isSyncConfigured } from '@/lib/supabase';
 import { createGroup, joinGroup, leaveGroup, leaveSession, setMemberName } from '@/lib/sync';
 import type { SavedPerson } from '@/lib/types';
@@ -39,6 +40,7 @@ export default function SettingsScreen() {
   const [joiningGroup, setJoiningGroup] = useState(false);
   const [busy, setBusy] = useState(false);
   const bottomInset = useBottomInset();
+  const startTour = useStartTour();
 
   /** Rond een groepsactie af en maak van een mislukking een leesbare melding. */
   const runGroup = async (action: () => Promise<void>) => {
@@ -275,6 +277,19 @@ export default function SettingsScreen() {
             />
           </View>
         ) : null}
+
+        <View style={{ gap: space.sm, marginTop: space.md }}>
+          <SectionTitle>Rondleiding</SectionTitle>
+          <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+            Een korte wandeling door de app zelf. Hij maakt een voorbeeldlijst aan om iets te
+            laten zien en ruimt die daarna weer op; je eigen lijsten blijven zoals ze zijn.
+          </Text>
+          <Button
+            title="Rondleiding opnieuw bekijken"
+            variant="secondary"
+            onPress={startTour}
+          />
+        </View>
 
         <View style={{ gap: space.xs, marginTop: space.md }}>
           <SectionTitle>Over je gegevens</SectionTitle>
