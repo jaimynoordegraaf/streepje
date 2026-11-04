@@ -27,6 +27,7 @@ import { useNewList } from '@/components/new-list';
 import { TourTarget } from '@/components/tour';
 import { BottomBar, Button, Card, EmptyState, Screen } from '@/components/ui';
 import { formatCents } from '@/lib/money';
+import { useWithPending } from '@/lib/pending';
 import { useEvent, useStore } from '@/lib/store';
 import { ANCHOR } from '@/lib/tour';
 import { useEventSync, type SyncStatus } from '@/lib/use-sync';
@@ -159,6 +160,9 @@ export function ListScreen({ id }: { id: string }) {
   const theme = useTheme();
   const router = useRouter();
   const event = useEvent(id);
+  // Met wat er nog wacht om teruggenomen te worden erbij, voor de aantallen en
+  // bedragen op dit scherm. Wat vaststaat blijft `event`.
+  const withWaiting = useWithPending(event);
   const events = useStore((state) => state.events);
   const addPerson = useStore((state) => state.addPerson);
   const addMembers = useStore((state) => state.addMembers);
@@ -194,6 +198,7 @@ export function ListScreen({ id }: { id: string }) {
     );
   }
 
+  const counted = withWaiting ?? event;
   const tab = event.kind === 'tab';
   const people = activePeople(event);
   const nameOf = (personId: string | null) =>
@@ -278,10 +283,10 @@ export function ListScreen({ id }: { id: string }) {
             ) : null}
             <SummaryCard
               kind={event.kind}
-              total={eventTotalCents(event)}
-              received={eventPaidCents(event)}
-              outstanding={eventOutstandingCents(event)}
-              invoiced={eventInvoiceCents(event)}
+              total={eventTotalCents(counted)}
+              received={eventPaidCents(counted)}
+              outstanding={eventOutstandingCents(counted)}
+              invoiced={eventInvoiceCents(counted)}
             />
           </View>
         }
@@ -329,8 +334,10 @@ export function ListScreen({ id }: { id: string }) {
           />
         }
         renderItem={({ item: person, index }) => {
-          const total = personTotalCents(event, person.id);
-          const count = personItemCount(event, person.id);
+          const total = personTotalCents(counted, person.id);
+          const count = personItemCount(counted, person.id);
+          // Er zit een streep bij die nog niet vast staat.
+          const waiting = count !== personItemCount(event, person.id);
           const host = nameOf(person.guestOf);
           // On a tab everyone is invoiced, so saying so on every row is noise.
           const invoiced = !tab && !paysTonight(event, person);
@@ -349,7 +356,12 @@ export function ListScreen({ id }: { id: string }) {
                     <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>
                       {person.name}
                     </Text>
-                    <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 2 }}>
+                    <Text
+                      style={{
+                        color: waiting ? theme.accent : theme.textDim,
+                        fontSize: 13,
+                        marginTop: 2,
+                      }}>
                       {count} {count === 1 ? 'consumptie' : 'consumpties'}
                       {person.note ? ' · ' + person.note : ''}
                       {host ? ' · gast van ' + host : ''}

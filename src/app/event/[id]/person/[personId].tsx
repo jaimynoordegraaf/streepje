@@ -22,6 +22,7 @@ import {
   lockCorrections,
   unlockCorrections,
 } from '@/lib/pin';
+import { usePending, useWithPending } from '@/lib/pending';
 import { useEvent, useStore } from '@/lib/store';
 import { ANCHOR } from '@/lib/tour';
 import { activeMenu, itemCents, personItemCount, personTotalCents, quantities } from '@/lib/totals';
@@ -32,6 +33,11 @@ export default function PersonScreen() {
   const theme = useTheme();
   const { id, personId } = useLocalSearchParams<{ id: string; personId: string }>();
   const event = useEvent(id);
+  // De lijst met wat nog wacht om teruggenomen te worden erbij, om te tellen en
+  // te laten zien. Wat vaststaat (en dus wat een correctie kan raken) blijft
+  // `event`.
+  const withWaiting = useWithPending(event);
+  const addWaiting = usePending((state) => state.add);
   const addOrder = useStore((state) => state.addOrder);
   const setCorrectionPin = useStore((state) => state.setCorrectionPin);
   const bottomInset = useBottomInset();
@@ -56,10 +62,14 @@ export default function PersonScreen() {
     );
   }
 
+  const counted = withWaiting ?? event;
   // Counted once here rather than per menu row, so the whole screen is one pass.
-  const counts = quantities(event, person.id);
+  const counts = quantities(counted, person.id);
+  // Alleen wat vaststaat: een correctie haalt daar een turf af, nooit een
+  // streep die nog wacht (die neem je terug met Ongedaan maken).
+  const settled = quantities(event, person.id);
   // What each item has cost so far, at the prices it was actually turfed at.
-  const spent = itemCents(event, person.id);
+  const spent = itemCents(counted, person.id);
   const offered = activeMenu(event);
   const drinks = offered.filter((item) => item.category === 'drink');
   const food = offered.filter((item) => item.category === 'food');
@@ -110,6 +120,10 @@ export default function PersonScreen() {
 
   const renderItem = ({ item }: { item: MenuItem }) => {
     const quantity = Math.max(0, counts[item.id] ?? 0);
+    // Hoeveel er al vaststaat. ✕ rekent alleen daarmee, anders kon een
+    // correctie een streep afhalen die er (nog) niet echt is.
+    const fixed = Math.max(0, settled[item.id] ?? 0);
+    const waiting = quantity > fixed;
     const shown = item.id === firstItemId;
     const card = (
       <Card style={{ paddingVertical: space.md }}>
@@ -126,11 +140,12 @@ export default function PersonScreen() {
             icon={(color, size) => <CrossIcon size={size} color={color} />}
             tourId={shown ? ANCHOR.correction : undefined}
             onPress={() => requestRemoval(item)}
-            disabled={event.closed || quantity === 0}
+            disabled={event.closed || fixed === 0}
           />
           <Text
             style={{
-              color: quantity > 0 ? theme.text : theme.textDim,
+              // Oranje zolang er een streep bij zit die nog niet vast staat.
+              color: waiting ? theme.accent : quantity > 0 ? theme.text : theme.textDim,
               fontSize: 20,
               fontWeight: '700',
               minWidth: 32,
@@ -143,7 +158,8 @@ export default function PersonScreen() {
             tone="accent"
             // A closed event is only looked at: what someone had, not adding to it.
             disabled={event.closed}
-            onPress={() => addOrder(id, person.id, item.id, 1)}
+            // Een streep wacht eerst even, zodat hij nog kan worden teruggenomen.
+            onPress={() => addWaiting(id, person.id, item.id)}
           />
         </View>
       </Card>
@@ -169,7 +185,7 @@ export default function PersonScreen() {
                 into it. The amount itself must never wrap. */}
             <View style={{ gap: 2, flexShrink: 1 }}>
               <Text style={{ color: theme.textDim, fontSize: 14 }}>
-                {personItemCount(event, person.id)} consumpties
+                {personItemCount(counted, person.id)} consumpties
               </Text>
               {event.closed ? (
                 <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '600' }}>
@@ -182,7 +198,7 @@ export default function PersonScreen() {
               ) : null}
             </View>
             <Text numberOfLines={1} style={{ color: theme.text, fontSize: 24, fontWeight: '800' }}>
-              {formatCents(personTotalCents(event, person.id))}
+              {formatCents(personTotalCents(counted, person.id))}
             </Text>
           </View>
         </TopBar>

@@ -2,11 +2,13 @@ import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, View, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BackIcon } from '@/components/icons';
 import { TourOverlay } from '@/components/tour';
+import { UndoStrip } from '@/components/undo-strip';
+import { flushPendingAfterStart, usePending } from '@/lib/pending';
 import { useStore } from '@/lib/store';
 import { font, space, type as typeScale, useTheme } from '@/theme';
 
@@ -19,6 +21,24 @@ function useHydrated(): boolean {
   const [hydrated, setHydrated] = useState(() => useStore.persist.hasHydrated());
   useEffect(() => useStore.persist.onFinishHydration(() => setHydrated(true)), []);
   return hydrated;
+}
+
+/**
+ * Strepen die nog wachten om teruggenomen te worden, vastzetten op de momenten
+ * dat dat niet meer kan: bij de start (van de vorige keer) en zodra de app naar
+ * de achtergrond gaat.
+ */
+function useSettlePending(hydrated: boolean) {
+  useEffect(() => {
+    if (hydrated) flushPendingAfterStart();
+  }, [hydrated]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'background') usePending.getState().commitAll();
+    });
+    return () => subscription.remove();
+  }, []);
 }
 
 /**
@@ -45,6 +65,7 @@ export default function RootLayout() {
   const theme = useTheme();
   const scheme = useColorScheme();
   const hydrated = useHydrated();
+  useSettlePending(hydrated);
   // Each face is required by its exact path. Importing from the package index
   // instead pulls in all 18 weights and italics, and a single unresolved file
   // among them takes down the whole bundle.
@@ -125,6 +146,7 @@ export default function RootLayout() {
               headerLeft: navigation.canGoBack() ? () => <HeaderBack /> : undefined,
             })}
           />
+          <UndoStrip />
           <TourOverlay />
         </View>
       </ThemeProvider>

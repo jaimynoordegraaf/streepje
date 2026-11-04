@@ -84,6 +84,36 @@ function withIds(items: Omit<MenuItem, 'id'>[]): MenuItem[] {
   return items.map((item) => ({ ...item, id: newId() }));
 }
 
+/**
+ * Eén regel voor het log, zoals hij op dit moment is.
+ *
+ * Staat los van `addOrder` omdat een turf ook al vóór het vastleggen een regel
+ * moet zijn (zie pending.ts): de prijs, de tijd en de telefoon horen bij de tik
+ * en niet bij het moment waarop de bedenktijd om is.
+ */
+export function buildEntry(
+  event: AppEvent,
+  deviceId: string,
+  deviceName: string | null,
+  personId: string,
+  itemId: string,
+  delta: number
+): OrderEntry {
+  const item = event.menu.find((candidate) => candidate.id === itemId);
+  return {
+    id: newId(),
+    personId,
+    itemId,
+    delta,
+    deviceId,
+    deviceName,
+    // Frozen at the tap. Changing the menu later must not reach back
+    // into turfs that were already made.
+    priceCents: item ? item.priceCents : null,
+    createdAt: Date.now(),
+  };
+}
+
 /** Replace one event in the list, leaving the others untouched. */
 function mapEvent(
   events: AppEvent[],
@@ -207,6 +237,12 @@ type StoreState = {
 
   /** Log an order (delta 1) or a correction (delta -1). Always appends. */
   addOrder: (eventId: string, personId: string, itemId: string, delta: number) => void;
+  /**
+   * Zet regels die al zijn opgebouwd in het log, in één keer. Alleen voor
+   * strepen die hun bedenktijd achter de rug hebben (pending.ts): wat hier
+   * binnenkomt staat vast en kan alleen nog met de correctiecode weg.
+   */
+  commitEntries: (eventId: string, entries: OrderEntry[]) => void;
 
   addDefaultPerson: (name: string, sectionId?: string | null) => void;
   renameDefaultPerson: (personId: string, name: string) => void;
@@ -592,19 +628,14 @@ export const useStore = create<StoreState>()(
         set({
           events: mapEvent(get().events, eventId, (event) => {
             if (event.closed) return event;
-            const item = event.menu.find((candidate) => candidate.id === itemId);
-            const entry: OrderEntry = {
-              id: newId(),
+            const entry = buildEntry(
+              event,
+              get().deviceId,
+              get().deviceName,
               personId,
               itemId,
-              delta,
-              deviceId: get().deviceId,
-              deviceName: get().deviceName,
-              // Frozen at the tap. Changing the menu later must not reach back
-              // into turfs that were already made.
-              priceCents: item ? item.priceCents : null,
-              createdAt: Date.now(),
-            };
+              delta
+            );
             return {
               ...event,
               entries: [...event.entries, entry],
@@ -612,6 +643,25 @@ export const useStore = create<StoreState>()(
             };
           }),
         }),
+
+      commitEntries: (eventId, entries) => {
+        if (entries.length === 0) return;
+        set({
+          events: mapEvent(get().events, eventId, (event) => {
+            if (event.closed) return event;
+            // Een regel die er al staat nog eens toevoegen zou een turf dubbel
+            // tellen en dubbel versturen.
+            const known = new Set(event.entries.map((entry) => entry.id));
+            const fresh = entries.filter((entry) => !known.has(entry.id));
+            if (fresh.length === 0) return event;
+            return {
+              ...event,
+              entries: [...event.entries, ...fresh],
+              unsyncedEntryIds: [...event.unsyncedEntryIds, ...fresh.map((entry) => entry.id)],
+            };
+          }),
+        });
+      },
 
       addDefaultPerson: (name, sectionId = null) =>
         set({

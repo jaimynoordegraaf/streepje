@@ -81,13 +81,13 @@ export const STEPS: TourStep[] = [
     screen: 'person',
     anchor: ANCHOR.item,
     title: 'Turven is één tik',
-    body: 'Tik op het plusje en de consumptie staat erop, tegen de prijs van dat moment. Elke tik is een eigen regel, dus twee telefoons kunnen tegelijk turven zonder elkaar te overschrijven.',
+    body: 'Tik op het plusje en de consumptie staat erop, tegen de prijs van dat moment. Misgetikt? Onderin staat een paar seconden Ongedaan maken, ook als je al bij de volgende bent. Daarna staat de tik vast. Elke tik is een eigen regel, dus twee telefoons kunnen tegelijk turven zonder elkaar te overschrijven.',
   },
   {
     screen: 'person',
     anchor: ANCHOR.correction,
     title: 'De correctiecode',
-    body: 'Turven mag iedereen, een turf weghalen niet. Dat kan alleen op een beheertelefoon en alleen met de correctiecode, want weghalen haalt geld van iemands rekening.',
+    body: 'Turven mag iedereen, een turf weghalen niet. Staat een tik eenmaal vast, dan kan dat alleen op een beheertelefoon en alleen met de correctiecode, want weghalen haalt geld van iemands rekening.',
   },
   {
     screen: 'event',
