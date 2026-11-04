@@ -34,7 +34,7 @@ import { useStore } from './store';
 export type Anchor = { x: number; y: number; width: number; height: number };
 
 /** De schermen waar de rondleiding langsgaat. */
-export type TourScreen = 'home' | 'event' | 'person' | 'totals' | 'log';
+export type TourScreen = 'event' | 'lists' | 'person' | 'totals' | 'log';
 
 export type TourStep = {
   screen: TourScreen;
@@ -59,7 +59,8 @@ export const ANCHOR = {
   item: 'item',
   correction: 'correction',
   round: 'round',
-  share: 'share',
+  /** De drie puntjes in de kop van een lijst. */
+  menu: 'menu',
   exports: 'exports',
 } as const;
 
@@ -71,16 +72,10 @@ export const ANCHOR = {
  */
 export const STEPS: TourStep[] = [
   {
-    screen: 'home',
-    anchor: ANCHOR.list,
-    title: 'Je lijsten',
-    body: 'Een lopende rekening voor de gewone baravonden, waar alles op de factuur van de penningmeester gaat, of een evenement voor een feest of een weekend weg. Dit is een voorbeeld; hij verdwijnt zodra de rondleiding klaar is.',
-  },
-  {
     screen: 'event',
     anchor: ANCHOR.person,
-    title: 'Iedereen die meedoet',
-    body: 'Leden haal je in één keer uit de lopende rekening, gasten voeg je los toe. Tik op een naam om voor die persoon te turven.',
+    title: 'Je streeplijst',
+    body: 'Zo opent de app ook: meteen in je lijst, met iedereen die meedoet. Leden haal je in één keer uit de lopende rekening, gasten voeg je los toe. Tik op een naam om voor die persoon te turven. Dit is een voorbeeld; hij verdwijnt zodra de rondleiding klaar is.',
   },
   {
     screen: 'person',
@@ -102,9 +97,15 @@ export const STEPS: TourStep[] = [
   },
   {
     screen: 'event',
-    anchor: ANCHOR.share,
-    title: 'Meer telefoons, één lijst',
-    body: 'Deel de lijst en elke telefoon die de code scant turft erin mee. Onder Instellingen staat de groep voor de barploeg: één keer scannen, en daarna verschijnt elke nieuwe lijst vanzelf.',
+    anchor: ANCHOR.menu,
+    title: 'Al het andere zit achter het menu',
+    body: 'Achter de drie puntjes staat alles wat geen turven is: Delen, Beheer, het logboek, je andere lijsten en de Instellingen. Deel je de lijst, dan turft elke telefoon die de code scant erin mee. De groep voor de barploeg staat onder Instellingen.',
+  },
+  {
+    screen: 'lists',
+    anchor: ANCHOR.list,
+    title: 'Je andere lijsten',
+    body: 'Via Alle lijsten in het menu kom je hier: een lopende rekening voor de gewone baravonden, waar alles op de factuur van de penningmeester gaat, of een evenement voor een feest of een weekend weg.',
   },
   {
     screen: 'totals',
@@ -116,7 +117,7 @@ export const STEPS: TourStep[] = [
     screen: 'log',
     anchor: null,
     title: 'Het logboek',
-    body: 'Elke tik blijft staan: wie wat turfde, voor wie, van welke telefoon en wanneer. Klopt een bedrag niet, dan zie je hier waar het is misgegaan.',
+    body: 'Elke tik blijft staan: wie wat turfde, voor wie, van welke telefoon en wanneer. Klopt een bedrag niet, dan zie je hier waar het is misgegaan. Je vindt het logboek in het menu.',
   },
 ];
 

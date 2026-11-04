@@ -70,10 +70,10 @@ const HALO = 8;
  */
 function pathFor(screen: TourScreen, eventId: string, personId: string): string {
   switch (screen) {
-    case 'home':
-      return '/';
     case 'event':
       return `/event/${eventId}`;
+    case 'lists':
+      return '/lists';
     case 'person':
       return `/event/${eventId}/person/${personId}`;
     case 'totals':
@@ -136,11 +136,11 @@ export function TourOverlay() {
     if (!screen || pathname === pathFor(screen, demoEventId, demoPersonId)) return;
 
     switch (screen) {
-      case 'home':
-        router.replace('/');
-        break;
       case 'event':
         router.replace({ pathname: '/event/[id]', params: { id: demoEventId } });
+        break;
+      case 'lists':
+        router.replace('/lists');
         break;
       case 'person':
         router.replace({
@@ -178,7 +178,8 @@ export function TourOverlay() {
   const finish = () => {
     stop();
     setTourSeen(true);
-    // Terug naar het beginscherm, dat de voorbeeldlijst opruimt zodra het ziet
+    // Terug naar het beginscherm (je lopende rekening, of de lege staat als er
+    // nog geen is), dat de voorbeeldlijst opruimt zodra het ziet
     // dat er geen rondleiding meer loopt. Opruimen vanaf hier zou een scherm
     // van die lijst in zijn laatste beeldjes "bestaat niet meer" laten zeggen.
     router.replace('/');

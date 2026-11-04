@@ -207,7 +207,7 @@ export default function SettingsScreen() {
           <SectionTitle>Vaste namen</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
             De mensen die er meestal zijn, zodat je ze niet elke keer opnieuw hoeft in te typen.
-            Onder Beheer van een lijst kies je wie er die avond bij komt: een hele speltak, of
+            In het menu van een lijst, onder Beheer, kies je wie er die avond bij komt: een hele speltak, of
             naam voor naam.
           </Text>
 
@@ -472,7 +472,7 @@ export default function SettingsScreen() {
             setGroup(joined);
             Alert.alert(
               joined.name,
-              'Je doet mee met deze groep. De lijsten verschijnen zo op het beginscherm.'
+              'Je doet mee met deze groep. De lijsten van de groep verschijnen zo onder Alle lijsten.'
             );
           });
         }}

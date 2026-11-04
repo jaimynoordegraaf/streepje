@@ -125,6 +125,12 @@ type StoreState = {
    * is er maar één plek die hem kan vergeten.
    */
   tourSeen: boolean;
+  /**
+   * De lopende rekening die als laatste is geopend, en dus waar de app mee
+   * opent. Zie `useHomeList` onderaan. Null zolang er nog geen is geopend; dan
+   * geldt de nieuwste rekening op deze telefoon.
+   */
+  homeTabId: string | null;
   events: AppEvent[];
   /** The menu that newly created events start from. */
   defaultMenu: MenuItem[];
@@ -153,6 +159,8 @@ type StoreState = {
   renameEvent: (eventId: string, name: string) => void;
   deleteEvent: (eventId: string) => void;
   setEventClosed: (eventId: string, closed: boolean) => void;
+  /** Onthoud welke lopende rekening de volgende keer als eerste opengaat. */
+  setHomeTab: (eventId: string) => void;
 
   /** Add someone by name. At an event that is a guest settling tonight, unless said otherwise. */
   addPerson: (
@@ -268,6 +276,7 @@ export const useStore = create<StoreState>()(
       deviceName: null,
       group: null,
       tourSeen: false,
+      homeTabId: null,
       events: [],
       defaultMenu: withIds(STARTER_MENU),
       defaultPeople: [],
@@ -373,6 +382,12 @@ export const useStore = create<StoreState>()(
 
       deleteEvent: (eventId) =>
         set({ events: get().events.filter((event) => event.id !== eventId) }),
+
+      setHomeTab: (eventId) => {
+        // Niets schrijven als hij al zo staat: het wordt bij elk bezoek aan
+        // de lijst aangeroepen, en elke schrijfbeurt gaat de opslag in.
+        if (get().homeTabId !== eventId) set({ homeTabId: eventId });
+      },
 
       setEventClosed: (eventId, closed) =>
         set({
@@ -785,7 +800,7 @@ export const useStore = create<StoreState>()(
         ...state,
         events: state.events.filter((event) => !event.demo),
       }),
-      version: 13,
+      version: 14,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -993,11 +1008,35 @@ export const useStore = create<StoreState>()(
           }));
         }
 
+        if (fromVersion < 14) {
+          // De app opent voortaan in de lopende rekening in plaats van in het
+          // overzicht, en onthoudt welke het laatst was. Wie er nog nooit een
+          // heeft geopend krijgt geen voorkeur; dan geldt de nieuwste.
+          state.homeTabId = null;
+        }
+
         return state;
       },
     }
   )
 );
+
+/**
+ * De lijst waar de app mee opent: de lopende rekening die als laatste is
+ * geopend, of anders de nieuwste. Undefined als deze telefoon er geen heeft.
+ *
+ * Alleen een lopende rekening telt. Een evenement is er één avond; wie de app
+ * daarna opent wil niet in een feest van vorige maand terechtkomen. En met
+ * meer dan één rekening is de laatst gebruikte de enige keuze die niemand
+ * hoeft uit te leggen: wie de oude rekening gebruikt blijft daar, wie een
+ * nieuw seizoen begint komt vanzelf bij de nieuwe uit.
+ */
+export function useHomeList(): AppEvent | undefined {
+  return useStore((state) => {
+    const tabs = state.events.filter((event) => event.kind === 'tab' && !event.demo);
+    return tabs.find((event) => event.id === state.homeTabId) ?? tabs[0];
+  });
+}
 
 /** Find one event by id, or undefined when the id is unknown. */
 export function useEvent(eventId: string | undefined): AppEvent | undefined {
