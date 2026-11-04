@@ -24,6 +24,7 @@ import {
 } from '@/components/menu';
 import { GuestModal, MemberPickerModal, PromptModal } from '@/components/modals';
 import { useNewList } from '@/components/new-list';
+import { Tally } from '@/components/tally';
 import { TourTarget } from '@/components/tour';
 import { BottomBar, Button, Card, EmptyState, Screen } from '@/components/ui';
 import { formatCents } from '@/lib/money';
@@ -168,6 +169,7 @@ export function ListScreen({ id }: { id: string }) {
   const addMembers = useStore((state) => state.addMembers);
   const addUnknownPerson = useStore((state) => state.addUnknownPerson);
   const setHomeTab = useStore((state) => state.setHomeTab);
+  const tallyMode = useStore((state) => state.tallyMode);
   const [adding, setAdding] = useState<'name' | 'guest' | 'members' | null>(null);
   const { status, pending, detailsPending } = useEventSync(event);
   const menu = useDropdown();
@@ -281,13 +283,17 @@ export function ListScreen({ id }: { id: string }) {
                 </Text>
               </Card>
             ) : null}
-            <SummaryCard
-              kind={event.kind}
-              total={eventTotalCents(counted)}
-              received={eventPaidCents(counted)}
-              outstanding={eventOutstandingCents(counted)}
-              invoiced={eventInvoiceCents(counted)}
-            />
+            {/* Op papier stond er geen totaal bij de streepjes. Het staat nog
+                onder Totalen. */}
+            {tallyMode ? null : (
+              <SummaryCard
+                kind={event.kind}
+                total={eventTotalCents(counted)}
+                received={eventPaidCents(counted)}
+                outstanding={eventOutstandingCents(counted)}
+                invoiced={eventInvoiceCents(counted)}
+              />
+            )}
           </View>
         }
         ListFooterComponent={
@@ -339,6 +345,7 @@ export function ListScreen({ id }: { id: string }) {
           // Er zit een streep bij die nog niet vast staat.
           const waiting = count !== personItemCount(event, person.id);
           const host = nameOf(person.guestOf);
+          const note = [person.note, host ? 'gast van ' + host : null].filter(Boolean).join(' · ');
           // On a tab everyone is invoiced, so saying so on every row is noise.
           const invoiced = !tab && !paysTonight(event, person);
           const row = (
@@ -356,16 +363,33 @@ export function ListScreen({ id }: { id: string }) {
                     <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>
                       {person.name}
                     </Text>
-                    <Text
-                      style={{
-                        color: waiting ? theme.accent : theme.textDim,
-                        fontSize: 13,
-                        marginTop: 2,
-                      }}>
-                      {count} {count === 1 ? 'consumptie' : 'consumpties'}
-                      {person.note ? ' · ' + person.note : ''}
-                      {host ? ' · gast van ' + host : ''}
-                    </Text>
+                    {tallyMode ? (
+                      // Zoals op papier: de streepjes onder de naam. Een notitie
+                      // of gastheer blijft als tekst staan: daaraan zie je welke
+                      // van twee dezelfde namen het is.
+                      <>
+                        {note ? (
+                          <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 2 }}>
+                            {note}
+                          </Text>
+                        ) : null}
+                        {count > 0 ? (
+                          <View style={{ marginTop: space.xs }}>
+                            <Tally count={count} color={waiting ? theme.accent : theme.text} />
+                          </View>
+                        ) : null}
+                      </>
+                    ) : (
+                      <Text
+                        style={{
+                          color: waiting ? theme.accent : theme.textDim,
+                          fontSize: 13,
+                          marginTop: 2,
+                        }}>
+                        {count} {count === 1 ? 'consumptie' : 'consumpties'}
+                        {note ? ' · ' + note : ''}
+                      </Text>
+                    )}
                   </View>
 
                   {invoiced ? (
@@ -374,9 +398,21 @@ export function ListScreen({ id }: { id: string }) {
                     <Badge label="BETAALD" color={theme.good} />
                   ) : null}
 
-                  <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>
-                    {formatCents(total)}
-                  </Text>
+                  {tallyMode ? (
+                    // Een klein totaal, om een lange rij niet na te hoeven tellen.
+                    <Text
+                      style={{
+                        color: waiting ? theme.accent : theme.textDim,
+                        fontSize: 14,
+                        fontWeight: '600',
+                      }}>
+                      {count}
+                    </Text>
+                  ) : (
+                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>
+                      {formatCents(total)}
+                    </Text>
+                  )}
                 </View>
               </Card>
             </Pressable>

@@ -161,6 +161,14 @@ type StoreState = {
    * geldt de nieuwste rekening op deze telefoon.
    */
   homeTabId: string | null;
+  /**
+   * Streepjes in plaats van bedragen bij de namen, zoals op de papieren lijst.
+   *
+   * Hoort bij het apparaat en niet bij een lijst: het gaat erom wie er naar
+   * dít scherm kijkt. Dus het reist nooit mee met het delen van een lijst.
+   * Totalen en de exports laten hun bedragen altijd zien.
+   */
+  tallyMode: boolean;
   events: AppEvent[];
   /** The menu that newly created events start from. */
   defaultMenu: MenuItem[];
@@ -191,6 +199,7 @@ type StoreState = {
   setEventClosed: (eventId: string, closed: boolean) => void;
   /** Onthoud welke lopende rekening de volgende keer als eerste opengaat. */
   setHomeTab: (eventId: string) => void;
+  setTallyMode: (on: boolean) => void;
 
   /** Add someone by name. At an event that is a guest settling tonight, unless said otherwise. */
   addPerson: (
@@ -313,6 +322,7 @@ export const useStore = create<StoreState>()(
       group: null,
       tourSeen: false,
       homeTabId: null,
+      tallyMode: false,
       events: [],
       defaultMenu: withIds(STARTER_MENU),
       defaultPeople: [],
@@ -731,6 +741,8 @@ export const useStore = create<StoreState>()(
 
       setTourSeen: (seen) => set({ tourSeen: seen }),
 
+      setTallyMode: (tallyMode) => set({ tallyMode }),
+
       setDeviceName: (deviceName) => set({ deviceName: deviceName.trim() || null }),
 
       setGroup: (group) => set({ group }),
@@ -850,7 +862,7 @@ export const useStore = create<StoreState>()(
         ...state,
         events: state.events.filter((event) => !event.demo),
       }),
-      version: 14,
+      version: 15,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -1063,6 +1075,12 @@ export const useStore = create<StoreState>()(
           // overzicht, en onthoudt welke het laatst was. Wie er nog nooit een
           // heeft geopend krijgt geen voorkeur; dan geldt de nieuwste.
           state.homeTabId = null;
+        }
+
+        if (fromVersion < 15) {
+          // Streepjes in plaats van bedragen is nieuw en staat standaard uit:
+          // een telefoon die de app al gebruikte ziet geen verschil.
+          state.tallyMode = false;
         }
 
         return state;
