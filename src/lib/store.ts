@@ -247,6 +247,18 @@ type StoreState = {
   /** Log an order (delta 1) or a correction (delta -1). Always appends. */
   addOrder: (eventId: string, personId: string, itemId: string, delta: number) => void;
   /**
+   * Een rondje: de gever betaalt voor drankjes van anderen.
+   *
+   * Elk drankje is een eigen regel (plus één) op de rekening van de gever, met
+   * erbij voor wie het was en bij welk rondje het hoort. Geeft het id van het
+   * rondje terug, of null als er niets is geboekt (afgesloten lijst, lege lijst).
+   */
+  addRound: (
+    eventId: string,
+    giverId: string,
+    drinks: { personId: string; itemId: string }[]
+  ) => string | null;
+  /**
    * Zet regels die al zijn opgebouwd in het log, in één keer. Alleen voor
    * strepen die hun bedenktijd achter de rug hebben (pending.ts): wat hier
    * binnenkomt staat vast en kan alleen nog met de correctiecode weg.
@@ -655,6 +667,19 @@ export const useStore = create<StoreState>()(
             };
           }),
         }),
+
+      addRound: (eventId, giverId, drinks) => {
+        const event = get().events.find((candidate) => candidate.id === eventId);
+        if (!event || event.closed || drinks.length === 0) return null;
+        const roundId = newId();
+        const entries = drinks.map((drink) => ({
+          ...buildEntry(event, get().deviceId, get().deviceName, giverId, drink.itemId, 1),
+          forPersonId: drink.personId,
+          roundId,
+        }));
+        get().commitEntries(eventId, entries);
+        return roundId;
+      },
 
       commitEntries: (eventId, entries) => {
         if (entries.length === 0) return;

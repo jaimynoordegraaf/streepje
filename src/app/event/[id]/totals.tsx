@@ -36,6 +36,7 @@ import {
   eventTotalCents,
   personLines,
   personTotalCents,
+  roundsFor,
 } from '@/lib/totals';
 import { radius, space, useTheme } from '@/theme';
 
@@ -193,6 +194,19 @@ export default function TotalsScreen() {
         renderItem={({ item: person }) => {
           const lines = personLines(event, person.id);
           const personTotal = personTotalCents(event, person.id);
+          // Rondjes: hoeveel hij gaf aan anderen (dat staat al in zijn bedrag),
+          // en wat hij kreeg van wie (zonder bedrag: dat staat bij de gever).
+          const round = roundsFor(event, person.id);
+          const nameOf = (personId: string) =>
+            event.people.find((candidate) => candidate.id === personId)?.name ?? 'onbekend';
+          const itemText = (itemIds: string[]) => {
+            const counts = new Map<string, number>();
+            for (const itemId of itemIds) counts.set(itemId, (counts.get(itemId) ?? 0) + 1);
+            return event.menu
+              .filter((item) => counts.has(item.id))
+              .map((item) => `${counts.get(item.id)}× ${item.name}`)
+              .join(', ');
+          };
           const removed = corrections(event, person.id);
           const settled = isSettled(event, person);
           const personOutstanding = personOutstandingCents(event, person);
@@ -227,7 +241,11 @@ export default function TotalsScreen() {
               </View>
 
               {lines.length === 0 ? (
-                <Text style={{ color: theme.textDim, fontSize: 13 }}>Niets geturfd</Text>
+                // Wie alleen uit een rondje dronk, heeft zelf niets geturfd, maar
+                // "niets" zou onwaar zijn: de regels eronder zeggen wat hij kreeg.
+                round.received.length === 0 ? (
+                  <Text style={{ color: theme.textDim, fontSize: 13 }}>Niets geturfd</Text>
+                ) : null
               ) : (
                 lines.map((line) => (
                   <View
@@ -244,6 +262,17 @@ export default function TotalsScreen() {
                   </View>
                 ))
               )}
+
+              {round.gave > 0 ? (
+                <Text style={{ color: theme.textDim, fontSize: 12 }}>
+                  Waarvan {round.gave}× in een rondje voor anderen
+                </Text>
+              ) : null}
+              {round.received.map((from) => (
+                <Text key={from.giverId} style={{ color: theme.textDim, fontSize: 12 }}>
+                  Rondje van {nameOf(from.giverId)}: {itemText(from.itemIds)}
+                </Text>
+              ))}
 
               {removed.length > 0 ? (
                 <View

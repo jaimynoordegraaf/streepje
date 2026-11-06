@@ -11,18 +11,24 @@ import { activeMenu, activePeople } from '@/lib/totals';
 import { radius, space, useTheme } from '@/theme';
 
 /**
- * Putting one drink on several people at once.
+ * Putting one drink on several people at once, each on their own account.
  *
- * At a bar people buy in rounds, and doing that person by person means leaving
+ * At a bar people order together, and doing that person by person means leaving
  * and re-entering a screen for every name. Here the item is chosen once and the
  * names are ticked off, which is how the order was given in the first place.
+ *
+ * Dit heette eerst Rondje. Een rondje is nu iets anders (rondje.tsx): daar
+ * betaalt één persoon voor de rest. Hier turft ieder voor zichzelf.
  */
-export default function RoundScreen() {
+export default function TegelijkTurvenScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const event = useEvent(id);
   const addOrder = useStore((state) => state.addOrder);
+  // Op de iPad staan er streepjes en geen bedragen; dan hoort hier ook geen
+  // rondjestotaal.
+  const tallyMode = useStore((state) => state.tallyMode);
 
   const [itemId, setItemId] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
@@ -30,17 +36,17 @@ export default function RoundScreen() {
   if (!event) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'Rondje' }} />
+        <Stack.Screen options={{ title: 'Tegelijk turven' }} />
         <EmptyState title="Dit evenement bestaat niet meer" />
       </Screen>
     );
   }
 
-  // The Rondje button is disabled on a closed event; this covers arriving anyway.
+  // The button is disabled on a closed event; this covers arriving anyway.
   if (event.closed) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'Rondje' }} />
+        <Stack.Screen options={{ title: 'Tegelijk turven' }} />
         <EmptyState title="Dit evenement is afgesloten" hint="Er kan niet meer geturfd worden." />
       </Screen>
     );
@@ -69,7 +75,9 @@ export default function RoundScreen() {
           <Button
             title={
               ready
-                ? `${chosen.length}× ${item.name} · ${formatCents(chosen.length * item.priceCents)}`
+                ? tallyMode
+                  ? `${chosen.length}× ${item.name}`
+                  : `${chosen.length}× ${item.name} · ${formatCents(chosen.length * item.priceCents)}`
                 : item === null
                   ? 'Kies eerst wat'
                   : 'Kies voor wie'
@@ -80,7 +88,7 @@ export default function RoundScreen() {
           />
         </BottomBar>
       }>
-      <Stack.Screen options={{ title: 'Rondje' }} />
+      <Stack.Screen options={{ title: 'Tegelijk turven' }} />
 
       <FlatList
         data={activePeople(event)}
@@ -109,7 +117,7 @@ export default function RoundScreen() {
                         fontWeight: '600',
                         fontSize: 14,
                       }}>
-                      {candidate.name} · {formatCents(candidate.priceCents)}
+                      {tallyMode ? candidate.name : `${candidate.name} · ${formatCents(candidate.priceCents)}`}
                     </Text>
                   </Pressable>
                 );

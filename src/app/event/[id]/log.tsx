@@ -20,11 +20,13 @@ import { Text } from '@/components/text';
 import { Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { formatCents } from '@/lib/money';
 import { useEvent } from '@/lib/store';
+import { rounds } from '@/lib/totals';
 import { space, useTheme } from '@/theme';
 
 type Row =
   | { id: string; at: number; kind: 'turf'; person: string; item: string; delta: number; device: string | null }
   | { id: string; at: number; kind: 'payment'; person: string; cents: number }
+  | { id: string; at: number; kind: 'round'; person: string; what: string; names: string; device: string | null }
   | { id: string; at: number; kind: 'removed'; person: string; device: string | null };
 
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -75,7 +77,9 @@ export default function LogScreen() {
     const itemOf = (itemId: string) =>
       event.menu.find((item) => item.id === itemId)?.name ?? 'Onbekend item';
 
-    const out: Row[] = event.entries.map((entry) => ({
+    // Een rondje is in de opslag één regel per drankje. Hier wordt het één
+    // regel: zes regels op dezelfde minuut verdrinken de rest van de avond.
+    const out: Row[] = event.entries.filter((entry) => !entry.roundId).map((entry) => ({
       id: entry.id,
       at: entry.createdAt,
       kind: 'turf',
@@ -84,6 +88,18 @@ export default function LogScreen() {
       delta: entry.delta,
       device: entry.deviceName,
     }));
+
+    for (const round of rounds(event)) {
+      out.push({
+        id: `round-${round.id}`,
+        at: round.at,
+        kind: 'round',
+        person: `Rondje van ${nameOf(round.giverId)}`,
+        what: round.items.map((line) => `${line.quantity}× ${itemOf(line.itemId)}`).join(', '),
+        names: round.recipientIds.map(nameOf).join(', '),
+        device: round.deviceName,
+      });
+    }
 
     for (const person of event.people) {
       if (person.paidAt && person.paidCents > 0) {
@@ -109,7 +125,10 @@ export default function LogScreen() {
     return out.sort((a, b) => b.at - a.at);
   }, [event]);
 
-  const shown = filter === 'correcties' ? rows.filter((row) => row.kind !== 'turf' || row.delta < 0) : rows;
+  const shown =
+    filter === 'correcties'
+      ? rows.filter((row) => (row.kind === 'turf' ? row.delta < 0 : row.kind !== 'round'))
+      : rows;
 
   const sections = useMemo(() => {
     const groups: { title: string; data: Row[] }[] = [];
@@ -135,21 +154,34 @@ export default function LogScreen() {
 
   const renderRow = ({ item: row }: { item: Row }) => {
     const accent =
-      row.kind === 'payment' ? theme.good : row.kind === 'removed' ? theme.danger : row.delta < 0 ? theme.danger : theme.text;
+      row.kind === 'payment'
+        ? theme.good
+        : row.kind === 'removed'
+          ? theme.danger
+          : row.kind === 'round'
+            ? theme.text
+            : row.delta < 0
+              ? theme.danger
+              : theme.text;
 
     const what =
       row.kind === 'turf'
         ? `${row.delta > 0 ? '+' : '−'}${Math.abs(row.delta)} ${row.item}`
-        : row.kind === 'payment'
-          ? `Betaald ${formatCents(row.cents)}`
-          : 'Uit de lijst gehaald';
+        : row.kind === 'round'
+          ? row.what
+          : row.kind === 'payment'
+            ? `Betaald ${formatCents(row.cents)}`
+            : 'Uit de lijst gehaald';
 
+    const device = row.kind === 'payment' ? null : row.device;
     const by =
       row.kind === 'payment'
         ? 'Stand van nu, geen geschiedenis'
-        : row.device
-          ? `op ${row.device}`
-          : 'telefoon onbekend';
+        : row.kind === 'round'
+          ? `voor ${row.names}${device ? ` · op ${device}` : ''}`
+          : device
+            ? `op ${device}`
+            : 'telefoon onbekend';
 
     return (
       <Card style={{ paddingVertical: space.md }}>
@@ -180,8 +212,9 @@ export default function LogScreen() {
         ListHeaderComponent={
           <View style={{ gap: space.sm, marginBottom: space.sm }}>
             <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-              Elke tik staat hier apart, met de telefoon waarop hij is gezet. Betalingen en
-              verwijderingen tonen de stand van nu; daarvan bewaart de app geen geschiedenis.
+              Elke tik staat hier apart, met de telefoon waarop hij is gezet. Een rondje staat als
+              één regel. Betalingen en verwijderingen tonen de stand van nu; daarvan bewaart de
+              app geen geschiedenis.
             </Text>
             <Choice
               options={[

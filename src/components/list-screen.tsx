@@ -7,7 +7,7 @@
  *
  * Alles wat geen turven is zit achter het menu in de kop (zie menu.tsx): wat de
  * barploeg af en toe nodig heeft bovenaan, de rest achter de beheercode. Op het
- * scherm zelf staat alleen de lijst en onderin Rondje.
+ * scherm zelf staat alleen de lijst en onderin Tegelijk turven en Rondje.
  */
 
 import { Stack, useRouter } from 'expo-router';
@@ -23,6 +23,7 @@ import {
   useGlobalItems,
   type DropdownItem,
 } from '@/components/menu';
+import { BellIcon } from '@/components/bell';
 import { GuestModal, MemberPickerModal, PromptModal } from '@/components/modals';
 import { Tally } from '@/components/tally';
 import { TourTarget } from '@/components/tour';
@@ -265,13 +266,24 @@ export function ListScreen({ id }: { id: string }) {
     <Screen
       footer={
         <BottomBar>
-          <Button
-            title="Rondje"
-            tourId={ANCHOR.round}
-            disabled={event.closed}
-            onPress={() => router.push({ pathname: '/event/[id]/round', params: { id } })}
-            style={{ flex: 1 }}
-          />
+          {/* Eén vlak voor de rondleiding, zodat hij naar de twee knoppen
+              samen kan wijzen. */}
+          <TourTarget id={ANCHOR.round} style={{ flex: 1, flexDirection: 'row', gap: space.sm }}>
+            <Button
+              title="Tegelijk turven"
+              variant="secondary"
+              disabled={event.closed}
+              onPress={() => router.push({ pathname: '/event/[id]/tegelijk', params: { id } })}
+              style={{ flex: 1 }}
+            />
+            <Button
+              title="Rondje"
+              icon={(color, size) => <BellIcon size={size} color={color} />}
+              disabled={event.closed}
+              onPress={() => router.push({ pathname: '/event/[id]/rondje', params: { id } })}
+              style={{ flex: 1 }}
+            />
+          </TourTarget>
         </BottomBar>
       }>
       <Stack.Screen

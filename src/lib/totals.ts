@@ -136,10 +136,107 @@ export function itemCents(event: AppEvent, personId: string): Record<string, num
   return result;
 }
 
-/** How many things one person has had in total, regardless of price. */
+/**
+ * How many things one person has had in total, regardless of price.
+ *
+ * Telt wat iemand dronk, niet wat hij betaalt: een drankje uit een rondje telt
+ * bij de ontvanger (`forPersonId`), ook al staat het geld op de gever. Het
+ * bedrag volgt de gever, zie `personTotalCents`.
+ */
 export function personItemCount(event: AppEvent, personId: string): number {
-  const counts = quantities(event, personId);
+  const counts: Record<string, number> = {};
+  for (const entry of event.entries) {
+    if ((entry.forPersonId ?? entry.personId) !== personId) continue;
+    counts[entry.itemId] = (counts[entry.itemId] ?? 0) + entry.delta;
+  }
   return Object.values(counts).reduce((sum, quantity) => sum + Math.max(0, quantity), 0);
+}
+
+/** Eén rondje: wie gaf, wat, voor wie, en wat het kostte. */
+export type Round = {
+  id: string;
+  at: number;
+  giverId: string;
+  deviceName: string | null;
+  /** Per drankje hoeveel, in de volgorde van het menu. */
+  items: { itemId: string; quantity: number }[];
+  /** Wie een drankje kreeg, elk één keer, de gever zelf meegeteld als hij meedronk. */
+  recipientIds: string[];
+  cents: number;
+};
+
+/**
+ * De rondjes van een lijst, oudste eerst.
+ *
+ * In de opslag zijn het losse regels (één per drankje), zodat niets in het log
+ * hoeft te veranderen. Hier worden ze weer bij elkaar gezocht, voor het
+ * logboek en de export.
+ */
+export function rounds(event: AppEvent): Round[] {
+  const menuPrice = new Map(event.menu.map((item) => [item.id, item.priceCents]));
+  const menuOrder = new Map(event.menu.map((item, index) => [item.id, index]));
+  const byId = new Map<string, Round>();
+  const counts = new Map<string, Map<string, number>>();
+
+  for (const entry of event.entries) {
+    if (!entry.roundId || entry.delta <= 0) continue;
+    let round = byId.get(entry.roundId);
+    if (!round) {
+      round = {
+        id: entry.roundId,
+        at: entry.createdAt,
+        giverId: entry.personId,
+        deviceName: entry.deviceName,
+        items: [],
+        recipientIds: [],
+        cents: 0,
+      };
+      byId.set(entry.roundId, round);
+      counts.set(entry.roundId, new Map());
+    }
+    round.at = Math.min(round.at, entry.createdAt);
+    const perItem = counts.get(entry.roundId)!;
+    perItem.set(entry.itemId, (perItem.get(entry.itemId) ?? 0) + entry.delta);
+    const recipient = entry.forPersonId ?? entry.personId;
+    if (!round.recipientIds.includes(recipient)) round.recipientIds.push(recipient);
+    round.cents += entry.delta * (entry.priceCents ?? menuPrice.get(entry.itemId) ?? 0);
+  }
+
+  for (const [id, round] of byId) {
+    round.items = [...counts.get(id)!]
+      .map(([itemId, quantity]) => ({ itemId, quantity }))
+      .sort((a, b) => (menuOrder.get(a.itemId) ?? 0) - (menuOrder.get(b.itemId) ?? 0));
+  }
+  return [...byId.values()].sort((a, b) => a.at - b.at);
+}
+
+/**
+ * Wat een persoon met rondjes te maken had, om onder zijn naam te zetten:
+ * hoeveel hij gaf aan anderen, en wat hij van wie kreeg. Zonder bedragen: het
+ * geld staat bij de gever.
+ */
+export function roundsFor(
+  event: AppEvent,
+  personId: string
+): { gave: number; received: { giverId: string; quantity: number; itemIds: string[] }[] } {
+  let gave = 0;
+  const received = new Map<string, { giverId: string; quantity: number; itemIds: string[] }>();
+  for (const entry of event.entries) {
+    if (!entry.roundId || entry.delta <= 0) continue;
+    const recipient = entry.forPersonId ?? entry.personId;
+    if (entry.personId === personId && recipient !== personId) gave += entry.delta;
+    if (recipient === personId && entry.personId !== personId) {
+      const known = received.get(entry.personId) ?? {
+        giverId: entry.personId,
+        quantity: 0,
+        itemIds: [] as string[],
+      };
+      known.quantity += entry.delta;
+      for (let i = 0; i < entry.delta; i++) known.itemIds.push(entry.itemId);
+      received.set(entry.personId, known);
+    }
+  }
+  return { gave, received: [...received.values()] };
 }
 
 /** People still part of the event. Removed ones are kept, but do not count. */

@@ -66,6 +66,9 @@ type EntryRow = {
   device_name: string | null;
   /** Null from app versions older than the price being recorded. */
   price_cents: number | null;
+  /** Alleen bij een rondje, en pas na supabase/018-rondjes.sql. */
+  for_person_id?: string | null;
+  round_id?: string | null;
   created_at: string;
 };
 
@@ -126,6 +129,8 @@ const toEntry = (row: EntryRow): OrderEntry => ({
   deviceId: row.device_id,
   deviceName: row.device_name,
   priceCents: row.price_cents ?? null,
+  forPersonId: row.for_person_id ?? null,
+  roundId: row.round_id ?? null,
   createdAt: Date.parse(row.created_at),
 });
 
@@ -138,6 +143,11 @@ const fromEntry = (sessionId: string, entry: OrderEntry): EntryRow => ({
   device_id: entry.deviceId,
   device_name: entry.deviceName,
   price_cents: entry.priceCents,
+  // Alleen bij een rondje. Een gewone turf stuurt de kolommen niet mee, zodat
+  // hij ook werkt zolang de server ze nog niet heeft.
+  ...(entry.roundId
+    ? { for_person_id: entry.forPersonId ?? null, round_id: entry.roundId }
+    : {}),
   created_at: new Date(entry.createdAt).toISOString(),
 });
 

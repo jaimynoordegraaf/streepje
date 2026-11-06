@@ -31,6 +31,7 @@ import {
   personTotalCents,
   eventInvoiceCents,
   paysTonight,
+  rounds,
 } from './totals';
 import type { AppEvent, Person } from './types';
 
@@ -122,6 +123,37 @@ export function buildCsv(event: AppEvent, local?: LocalDevice): string {
     }
   }
 
+
+  // De rondjes: wie gaf, wat, en voor wie. De drankjes staan al in de kolommen
+  // van de gever hierboven (zij betaalt), dus dit blok verandert geen bedrag. Het
+  // laat alleen zien waar het geld vandaan kwam.
+  const given = rounds(event);
+  if (given.length > 0) {
+    const personName = (personId: string) =>
+      event.people.find((person) => person.id === personId)?.name ?? 'onbekend';
+    const itemName = (itemId: string) =>
+      event.menu.find((item) => item.id === itemId)?.name ?? 'onbekend';
+
+    rows.push('');
+    rows.push(csvRow(['RONDJES']));
+    rows.push(csvRow(['Tijd', 'Gever', 'Item', 'Aantal', 'Bedrag', 'Voor wie']));
+    for (const round of given) {
+      const who = round.recipientIds.map(personName).join(', ');
+      round.items.forEach((line, index) => {
+        rows.push(
+          csvRow([
+            formatDateTime(round.at),
+            personName(round.giverId),
+            itemName(line.itemId),
+            line.quantity,
+            // Het bedrag van het hele rondje staat één keer, bij de eerste regel.
+            index === 0 ? centsToPlainNumber(round.cents) : '',
+            index === 0 ? who : '',
+          ])
+        );
+      });
+    }
+  }
 
   // People taken off the event. Their turfs are not deleted and their money
   // no longer counts, so the record has to say who went and who removed them.

@@ -173,6 +173,14 @@ export type OrderEntry = {
    * from before prices were recorded, which count at the menu price.
    */
   priceCents: number | null;
+  /**
+   * Bij een rondje: voor wie het drankje was. De regel zelf (`personId`) staat
+   * op de gever, want die betaalt. Leeg bij een gewone turf, waar wie het
+   * dronk en wie het betaalt dezelfde persoon is.
+   */
+  forPersonId?: string | null;
+  /** Bij een rondje: welk rondje, om de regels weer bij elkaar te zoeken. */
+  roundId?: string | null;
   createdAt: number;
 };
 
