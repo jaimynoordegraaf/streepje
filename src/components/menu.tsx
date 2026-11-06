@@ -10,8 +10,8 @@
  * platforms hetzelfde, inclusief de terugknop van Android die hem sluit.
  *
  * Het menu heeft twee lagen. Wat de barploeg nodig heeft staat bovenaan en is
- * open. Alles eronder (totalen, logboek, beheer, delen, alle lijsten,
- * instellingen) zit achter de beheercode: zie `gate` in DropdownMenu.
+ * open. Alles eronder (totalen, logboek, delen, deze lijst, dit toestel, alle
+ * lijsten) zit achter de beheercode: zie `gate` in DropdownMenu.
  *
  * De staat van het menu (open of dicht) hoort in het scherm, niet in de kop.
  * Een `headerRight: () => <...>` is bij elke render van het scherm een nieuw
@@ -144,7 +144,7 @@ export function DropdownMenu({
    * Het slot op het onderste blok van het menu.
    *
    * Het gebruikt de code die er al is: de correctiecode van de lijst waar de
-   * app mee opent, zoals de schakelaar voor streepjes in Instellingen. Er komt
+   * app mee opent, zoals de weergave onder Dit toestel. Er komt
    * geen tweede code bij. Na een goede code staat alles twee minuten open (het
    * venster van pin.ts), dus Totalen en dan Logboek vraagt maar één keer.
    *
@@ -286,6 +286,6 @@ export function useGlobalItems({ hideLists = false }: { hideLists?: boolean } = 
   if (!hideLists) {
     items.push({ label: 'Alle lijsten', onPress: () => router.push('/lists'), locked: true });
   }
-  items.push({ label: 'Instellingen', onPress: () => router.push('/settings'), locked: true });
+  items.push({ label: 'Dit toestel', onPress: () => router.push('/settings'), locked: true });
   return items;
 }

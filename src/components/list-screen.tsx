@@ -249,7 +249,7 @@ export function ListScreen({ id }: { id: string }) {
       locked: true,
     },
     {
-      label: 'Beheer',
+      label: 'Deze lijst',
       onPress: () => router.push({ pathname: '/event/[id]/setup', params: { id } }),
       locked: true,
     },

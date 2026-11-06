@@ -93,7 +93,7 @@ export const STEPS: TourStep[] = [
     screen: 'event',
     anchor: ANCHOR.menu,
     title: 'Een naam erbij, en de rest',
-    body: 'Achter de drie puntjes zet je bovenaan een naam erbij: een lid, een gast of Onbekend. Alles daaronder (totalen, logboek, beheer, delen, andere lijsten en instellingen) is voor de beheerder en vraagt de beheercode.',
+    body: 'Achter de drie puntjes zet je bovenaan een naam erbij: een lid, een gast of Onbekend. Alles daaronder (totalen, logboek, delen, deze lijst, dit toestel en andere lijsten) is voor de beheerder en vraagt de beheercode.',
   },
 ];
 

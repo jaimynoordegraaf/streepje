@@ -720,7 +720,7 @@ export function SavedPeoplePickerModal({
   onSubmit,
 }: {
   visible: boolean;
-  /** De vaste lijst, zoals hij onder Instellingen staat. */
+  /** De vaste lijst, zoals hij onder Dit toestel staat. */
   people: SavedPerson[];
   sections: Section[];
   /** Namen die al in de lijst staan. Vergelijken gaat zonder hoofdletters. */
@@ -800,7 +800,7 @@ export function SavedPeoplePickerModal({
         {available.length === 0 ? (
           <Text style={{ color: theme.textDim, fontSize: 14, lineHeight: 20 }}>
             {people.length === 0
-              ? 'Er staan nog geen vaste namen. Onder Instellingen zet je de mensen die er meestal zijn, en daar verdeel je ze ook over speltakken.'
+              ? 'Er staan nog geen vaste namen. Onder Dit toestel, bij Voor nieuwe lijsten, zet je de mensen die er meestal zijn, en daar verdeel je ze ook over speltakken.'
               : 'Iedereen uit de vaste lijst staat al in deze lijst.'}
           </Text>
         ) : (

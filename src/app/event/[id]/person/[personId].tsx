@@ -224,7 +224,7 @@ export default function PersonScreen() {
         ListEmptyComponent={
           <EmptyState
             title="Dit evenement heeft nog geen menu"
-            hint="Open Beheer bij het evenement om drankjes en eten toe te voegen."
+            hint="Open Deze lijst in het menu om drankjes en eten toe te voegen."
           />
         }
       />

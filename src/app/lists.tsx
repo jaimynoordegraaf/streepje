@@ -131,7 +131,7 @@ export default function ListsScreen() {
         options={{
           title: 'Alle lijsten',
           headerRight: () => (
-            <HeaderButton title="Instellingen" onPress={() => router.push('/settings')} />
+            <HeaderButton title="Dit toestel" onPress={() => router.push('/settings')} />
           ),
         }}
       />

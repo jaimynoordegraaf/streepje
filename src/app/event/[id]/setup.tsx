@@ -61,11 +61,14 @@ export default function SetupScreen() {
   if (!event) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'Beheer' }} />
+        <Stack.Screen options={{ title: 'Deze lijst' }} />
         <EmptyState title="Dit evenement bestaat niet meer" />
       </Screen>
     );
   }
+
+  // Een lopende rekening is geen evenement, dus zo heet hij hier ook niet.
+  const noun = event.kind === 'tab' ? 'Lijst' : 'Evenement';
 
   const doRemove = (person: Person) => removePerson(id, person.id, deviceName);
 
@@ -205,14 +208,19 @@ export default function SetupScreen() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: 'Beheer' }} />
+      <Stack.Screen options={{ title: 'Deze lijst' }} />
 
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: 48 + bottomInset }}>
+        <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+          Voor {event.name}. Wat je hier verandert, geldt alleen voor deze lijst. Wat voor het hele
+          toestel geldt staat onder Dit toestel.
+        </Text>
+
         <View style={{ gap: space.sm }}>
           <SectionTitle>Correctiecode</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
             {isAdminDevice(event)
-              ? 'Zonder deze code kan niemand op deze telefoon een turfje weghalen. Turven zelf blijft gewoon één tik. Dezelfde code opent ook het onderste deel van het menu: Totalen, Logboek, Beheer, Delen, Alle lijsten en Instellingen. De code staat alleen op deze telefoon, elke beheertelefoon heeft zijn eigen, en een vergeten code is niet te herstellen: schrijf hem op.'
+              ? 'Zonder deze code kan niemand op deze telefoon een turfje weghalen. Turven zelf blijft gewoon één tik. Dezelfde code opent ook het onderste deel van het menu: Totalen, Logboek, Delen, Deze lijst, Dit toestel en Alle lijsten. De code staat alleen op deze telefoon, elke beheertelefoon heeft zijn eigen, en een vergeten code is niet te herstellen: schrijf hem op.'
               : 'Turfjes weghalen kan alleen op een beheertelefoon. Op deze telefoon kun je wel turven, maar niets weghalen. Een beheerder kan deze telefoon beheerder maken onder Delen.'}
           </Text>
 
@@ -241,7 +249,7 @@ export default function SetupScreen() {
         </View>
 
         <View style={{ gap: space.sm }}>
-          <SectionTitle>Evenement</SectionTitle>
+          <SectionTitle>Naam</SectionTitle>
           <Card>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
               <Text style={{ flex: 1, color: theme.text, fontSize: 17, fontWeight: '700' }}>
@@ -255,10 +263,10 @@ export default function SetupScreen() {
         </View>
 
         <View style={{ gap: space.sm }}>
-          <SectionTitle>Menu voor dit evenement</SectionTitle>
+          <SectionTitle>Menu en prijzen</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, marginBottom: space.xs }}>
             {isAdminDevice(event)
-              ? 'Prijzen hier gelden alleen voor dit evenement. Een nieuwe prijs geldt voor wat je vanaf nu turft; wat al geturfd is houdt zijn prijs.'
+              ? 'Prijzen hier gelden alleen voor deze lijst. Een nieuwe prijs geldt voor wat je vanaf nu turft; wat al geturfd is houdt zijn prijs.'
               : 'Alleen een beheertelefoon kan het menu en de prijzen aanpassen.'}
           </Text>
           <MenuEditor
@@ -396,13 +404,13 @@ export default function SetupScreen() {
                 : 'Alleen een beheertelefoon kan dit evenement afsluiten.'}
             </Text>
           ) : null}
-          <Button title="Evenement verwijderen" variant="danger" onPress={confirmDeleteEvent} />
+          <Button title={`${noun} verwijderen`} variant="danger" onPress={confirmDeleteEvent} />
         </View>
       </ScrollView>
 
       <PromptModal
         visible={renamingEvent}
-        title="Evenement hernoemen"
+        title={`${noun} hernoemen`}
         initialValue={event.name}
         onCancel={() => setRenamingEvent(false)}
         onSubmit={(name) => {
@@ -494,7 +502,7 @@ export default function SetupScreen() {
         mode={deleteAsk === 'set' ? 'set' : 'verify'}
         eventId={id}
         record={event.correctionPin}
-        title="Evenement verwijderen"
+        title={`${noun} verwijderen`}
         explanation={
           deleteAsk === 'set'
             ? 'Er is nog geen correctiecode. Kies er een; die is vanaf nu nodig om te verwijderen.'
