@@ -15,6 +15,7 @@ import { guessLedger } from './ledger';
 import type {
   AppEvent,
   Billing,
+  Display,
   ListKind,
   MenuItem,
   OrderEntry,
@@ -162,13 +163,15 @@ type StoreState = {
    */
   homeTabId: string | null;
   /**
-   * Streepjes in plaats van bedragen bij de namen, zoals op de papieren lijst.
+   * Wat er bij de namen staat: bedragen, streepjes zoals op de papieren lijst,
+   * of alleen het aantal.
    *
    * Hoort bij het apparaat en niet bij een lijst: het gaat erom wie er naar
    * dít scherm kijkt. Dus het reist nooit mee met het delen van een lijst.
-   * Totalen en de exports laten hun bedragen altijd zien.
+   * Streepjes en aantallen laten dezelfde bedragen weg; Totalen en de exports
+   * laten hun bedragen altijd zien.
    */
-  tallyMode: boolean;
+  display: Display;
   events: AppEvent[];
   /** The menu that newly created events start from. */
   defaultMenu: MenuItem[];
@@ -199,7 +202,7 @@ type StoreState = {
   setEventClosed: (eventId: string, closed: boolean) => void;
   /** Onthoud welke lopende rekening de volgende keer als eerste opengaat. */
   setHomeTab: (eventId: string) => void;
-  setTallyMode: (on: boolean) => void;
+  setDisplay: (display: Display) => void;
 
   /** Add someone by name. At an event that is a guest settling tonight, unless said otherwise. */
   addPerson: (
@@ -334,7 +337,7 @@ export const useStore = create<StoreState>()(
       group: null,
       tourSeen: false,
       homeTabId: null,
-      tallyMode: false,
+      display: 'bedragen',
       events: [],
       defaultMenu: withIds(STARTER_MENU),
       defaultPeople: [],
@@ -768,7 +771,7 @@ export const useStore = create<StoreState>()(
 
       setTourSeen: (seen) => set({ tourSeen: seen }),
 
-      setTallyMode: (tallyMode) => set({ tallyMode }),
+      setDisplay: (display) => set({ display }),
 
       setDeviceName: (deviceName) => set({ deviceName: deviceName.trim() || null }),
 
@@ -889,7 +892,7 @@ export const useStore = create<StoreState>()(
         ...state,
         events: state.events.filter((event) => !event.demo),
       }),
-      version: 15,
+      version: 16,
       /**
        * Version 1 stored a running count per person per item. Version 2 stores
        * the order log instead. Each old count becomes a single entry carrying
@@ -1110,6 +1113,13 @@ export const useStore = create<StoreState>()(
           state.tallyMode = false;
         }
 
+        if (fromVersion < 16) {
+          // De schakelaar voor streepjes wordt een keuze uit drie. Een telefoon
+          // die streepjes aan had houdt streepjes; elke andere blijft op bedragen.
+          state.display = state.tallyMode ? 'streepjes' : 'bedragen';
+          delete state.tallyMode;
+        }
+
         return state;
       },
     }
@@ -1131,6 +1141,14 @@ export function useHomeList(): AppEvent | undefined {
     const tabs = state.events.filter((event) => event.kind === 'tab' && !event.demo);
     return tabs.find((event) => event.id === state.homeTabId) ?? tabs[0];
   });
+}
+
+/**
+ * Staan er op dit apparaat geen bedragen bij de namen? Voor streepjes en voor
+ * aantallen; dan horen ook de bedragen in knoppen en prijslabels weg.
+ */
+export function useHideAmounts(): boolean {
+  return useStore((state) => state.display !== 'bedragen');
 }
 
 /** Find one event by id, or undefined when the id is unknown. */

@@ -6,7 +6,7 @@ import { CheckIcon } from '@/components/icons';
 import { Text } from '@/components/text';
 import { BottomBar, Button, Card, EmptyState, Screen, SectionTitle } from '@/components/ui';
 import { formatCents } from '@/lib/money';
-import { useEvent, useStore } from '@/lib/store';
+import { useEvent, useHideAmounts, useStore } from '@/lib/store';
 import { activeMenu, activePeople } from '@/lib/totals';
 import { radius, space, useTheme } from '@/theme';
 
@@ -28,7 +28,7 @@ export default function TegelijkTurvenScreen() {
   const addOrder = useStore((state) => state.addOrder);
   // Op de iPad staan er streepjes en geen bedragen; dan hoort hier ook geen
   // rondjestotaal.
-  const tallyMode = useStore((state) => state.tallyMode);
+  const hideAmounts = useHideAmounts();
 
   const [itemId, setItemId] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
@@ -75,7 +75,7 @@ export default function TegelijkTurvenScreen() {
           <Button
             title={
               ready
-                ? tallyMode
+                ? hideAmounts
                   ? `${chosen.length}× ${item.name}`
                   : `${chosen.length}× ${item.name} · ${formatCents(chosen.length * item.priceCents)}`
                 : item === null
@@ -117,7 +117,7 @@ export default function TegelijkTurvenScreen() {
                         fontWeight: '600',
                         fontSize: 14,
                       }}>
-                      {tallyMode ? candidate.name : `${candidate.name} · ${formatCents(candidate.priceCents)}`}
+                      {hideAmounts ? candidate.name : `${candidate.name} · ${formatCents(candidate.priceCents)}`}
                     </Text>
                   </Pressable>
                 );

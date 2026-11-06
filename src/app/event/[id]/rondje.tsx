@@ -25,7 +25,7 @@ import {
   useBottomInset,
 } from '@/components/ui';
 import { formatCents } from '@/lib/money';
-import { useEvent, useStore } from '@/lib/store';
+import { useEvent, useHideAmounts, useStore } from '@/lib/store';
 import { activeMenu, activePeople } from '@/lib/totals';
 import { radius, space, useTheme } from '@/theme';
 
@@ -123,7 +123,7 @@ export default function RondjeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const event = useEvent(id);
   const addRound = useStore((state) => state.addRound);
-  const tallyMode = useStore((state) => state.tallyMode);
+  const hideAmounts = useHideAmounts();
   const bottomInset = useBottomInset();
 
   const [giverId, setGiverId] = useState<string | null>(null);
@@ -226,7 +226,7 @@ export default function RondjeScreen() {
     Alert.alert(
       `Rondje van ${giver.name}?`,
       `${describe()} voor ${recipients.map((person) => person.name).join(', ')}.` +
-        (tallyMode
+        (hideAmounts
           ? ` Alles komt op de rekening van ${giver.name}.`
           : ` ${formatCents(cents)} komt op de rekening van ${giver.name}.`) +
         (settlesTonight ? ` ${giver.name} rekent vanavond af, dus dat betaalt hij zelf vanavond.` : ''),
@@ -267,7 +267,7 @@ export default function RondjeScreen() {
           </Text>
           <Text style={{ color: theme.textDim, fontSize: 15, textAlign: 'center', lineHeight: 22 }}>
             Voor {rung.names}.{'\n'}
-            {tallyMode
+            {hideAmounts
               ? `Alles op de rekening van ${rung.giver}.`
               : `${formatCents(rung.cents)} op de rekening van ${rung.giver}.`}
           </Text>
@@ -280,7 +280,7 @@ export default function RondjeScreen() {
     ? 'Kies eerst wie geeft'
     : drinks.length === 0
       ? 'Kies voor wie'
-      : tallyMode
+      : hideAmounts
         ? `Luid de bel · ${drinks.length}×`
         : `Luid de bel · ${drinks.length}× · ${formatCents(cents)}`;
 
@@ -330,7 +330,7 @@ export default function RondjeScreen() {
               {menu.map((candidate) => (
                 <Pill
                   key={candidate.id}
-                  label={tallyMode ? candidate.name : `${candidate.name} · ${formatCents(candidate.priceCents)}`}
+                  label={hideAmounts ? candidate.name : `${candidate.name} · ${formatCents(candidate.priceCents)}`}
                   active={candidate.id === base?.id}
                   onPress={() => setItemId(candidate.id)}
                 />

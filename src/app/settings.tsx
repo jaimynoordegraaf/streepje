@@ -1,11 +1,11 @@
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/text';
 
 import { MenuEditor } from '@/components/menu-editor';
-import { PromptModal, SectionPickerModal } from '@/components/modals';
+import { Choice, PromptModal, SectionPickerModal } from '@/components/modals';
 import { PinModal } from '@/components/pin-modal';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { describeError } from '@/lib/errors';
@@ -14,7 +14,7 @@ import { newId, newJoinCode, useHomeList, useStore } from '@/lib/store';
 import { useStartTour } from '@/lib/tour';
 import { isSyncConfigured } from '@/lib/supabase';
 import { createGroup, joinGroup, leaveGroup, leaveSession, setMemberName } from '@/lib/sync';
-import type { SavedPerson, Section } from '@/lib/types';
+import type { Display, SavedPerson, Section } from '@/lib/types';
 import { versionLine } from '@/lib/version';
 import { space, useTheme } from '@/theme';
 
@@ -53,12 +53,12 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const bottomInset = useBottomInset();
   const startTour = useStartTour();
-  const tallyMode = useStore((state) => state.tallyMode);
-  const setTallyMode = useStore((state) => state.setTallyMode);
+  const display = useStore((state) => state.display);
+  const setDisplay = useStore((state) => state.setDisplay);
   const setCorrectionPin = useStore((state) => state.setCorrectionPin);
   const home = useHomeList();
   // De stand waar de schakelaar naartoe wil, zolang de code nog gevraagd wordt.
-  const [switching, setSwitching] = useState<{ to: boolean; mode: 'verify' | 'set' } | null>(null);
+  const [switching, setSwitching] = useState<{ to: Display; mode: 'verify' | 'set' } | null>(null);
 
   /**
    * Het apparaat omzetten kan alleen met de code van de lijst waar de app mee
@@ -68,9 +68,10 @@ export default function SettingsScreen() {
    *
    * Zonder lijst valt er niets te beveiligen: dan gaat hij zonder vragen om.
    */
-  const requestTallyMode = (to: boolean) => {
+  const requestDisplay = (to: Display) => {
+    if (to === display) return;
     if (!home) {
-      setTallyMode(to);
+      setDisplay(to);
       return;
     }
     const block = correctionBlock(home);
@@ -193,21 +194,20 @@ export default function SettingsScreen() {
         <View style={{ gap: space.sm, marginTop: space.md }}>
           <SectionTitle>Weergave</SectionTitle>
           <Card style={{ gap: space.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-              <Text style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '600' }}>
-                Streepjes in plaats van bedragen
-              </Text>
-              <Switch
-                value={tallyMode}
-                onValueChange={requestTallyMode}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                accessibilityLabel="Streepjes in plaats van bedragen"
-              />
-            </View>
+            <Choice
+              options={[
+                { value: 'bedragen' as const, label: 'Bedragen' },
+                { value: 'streepjes' as const, label: 'Streepjes' },
+                { value: 'aantallen' as const, label: 'Aantallen' },
+              ]}
+              value={display}
+              onChange={requestDisplay}
+            />
             <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-              Bij de namen staan streepjes zoals op papier, geen bedragen, zodat niemand meekijkt
-              hoeveel iemand heeft. Totalen en de exports laten de bedragen wel zien. Geldt alleen
-              voor deze telefoon. Omzetten vraagt de correctiecode.
+              Wat er bij de namen staat. Bij Streepjes staan er streepjes zoals op papier, bij
+              Aantallen alleen het aantal. In beide gevallen staan er geen bedragen, zodat niemand
+              meekijkt hoeveel iemand heeft. Totalen en de exports laten de bedragen wel zien. Geldt
+              alleen voor deze telefoon. Omzetten vraagt de correctiecode.
             </Text>
           </Card>
         </View>
@@ -456,12 +456,12 @@ export default function SettingsScreen() {
         }
         onCancel={() => setSwitching(null)}
         onVerified={() => {
-          if (switching) setTallyMode(switching.to);
+          if (switching) setDisplay(switching.to);
           setSwitching(null);
         }}
         onSet={(record) => {
           if (home) setCorrectionPin(home.id, record);
-          if (switching) setTallyMode(switching.to);
+          if (switching) setDisplay(switching.to);
           setSwitching(null);
         }}
       />

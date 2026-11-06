@@ -128,6 +128,12 @@ export type Person = {
 export type ListKind = 'event' | 'tab';
 
 /**
+ * Wat er bij de namen staat op dit apparaat: de bedragen, streepjes zoals op
+ * papier, of alleen het aantal. Bij de laatste twee staan er geen bedragen.
+ */
+export type Display = 'bedragen' | 'streepjes' | 'aantallen';
+
+/**
  * How someone's consumption gets paid.
  *
  * `invoice`: onto the treasurer's quarterly invoice -- every member, and any

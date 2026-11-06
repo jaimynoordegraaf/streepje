@@ -170,7 +170,7 @@ export function ListScreen({ id }: { id: string }) {
   const addMembers = useStore((state) => state.addMembers);
   const addUnknownPerson = useStore((state) => state.addUnknownPerson);
   const setHomeTab = useStore((state) => state.setHomeTab);
-  const tallyMode = useStore((state) => state.tallyMode);
+  const display = useStore((state) => state.display);
   const [adding, setAdding] = useState<'name' | 'guest' | 'members' | null>(null);
   const { status, pending, detailsPending } = useEventSync(event);
   const menu = useDropdown();
@@ -313,7 +313,7 @@ export function ListScreen({ id }: { id: string }) {
             ) : null}
             {/* Op papier stond er geen totaal bij de streepjes. Het staat nog
                 onder Totalen. */}
-            {tallyMode ? null : (
+            {display !== 'bedragen' ? null : (
               <SummaryCard
                 kind={event.kind}
                 total={eventTotalCents(counted)}
@@ -360,7 +360,7 @@ export function ListScreen({ id }: { id: string }) {
                     <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>
                       {person.name}
                     </Text>
-                    {tallyMode ? (
+                    {display === 'streepjes' ? (
                       // Zoals op papier: de streepjes onder de naam. Een notitie
                       // of gastheer blijft als tekst staan: daaraan zie je welke
                       // van twee dezelfde namen het is.
@@ -376,6 +376,17 @@ export function ListScreen({ id }: { id: string }) {
                           </View>
                         ) : null}
                       </>
+                    ) : display === 'aantallen' ? (
+                      // Alleen het aantal: het getal staat rechts, hier het woord.
+                      <Text
+                        style={{
+                          color: waiting ? theme.accent : theme.textDim,
+                          fontSize: 13,
+                          marginTop: 2,
+                        }}>
+                        {count === 1 ? 'consumptie' : 'consumpties'}
+                        {note ? ' · ' + note : ''}
+                      </Text>
                     ) : (
                       <Text
                         style={{
@@ -395,13 +406,22 @@ export function ListScreen({ id }: { id: string }) {
                     <Badge label="BETAALD" color={theme.good} />
                   ) : null}
 
-                  {tallyMode ? (
+                  {display === 'streepjes' ? (
                     // Een klein totaal, om een lange rij niet na te hoeven tellen.
                     <Text
                       style={{
                         color: waiting ? theme.accent : theme.textDim,
                         fontSize: 14,
                         fontWeight: '600',
+                      }}>
+                      {count}
+                    </Text>
+                  ) : display === 'aantallen' ? (
+                    <Text
+                      style={{
+                        color: waiting ? theme.accent : theme.text,
+                        fontSize: 18,
+                        fontWeight: '700',
                       }}>
                       {count}
                     </Text>

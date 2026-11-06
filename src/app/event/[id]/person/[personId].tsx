@@ -23,7 +23,7 @@ import {
   unlockCorrections,
 } from '@/lib/pin';
 import { usePending, useWithPending } from '@/lib/pending';
-import { useEvent, useStore } from '@/lib/store';
+import { useEvent, useHideAmounts, useStore } from '@/lib/store';
 import { ANCHOR } from '@/lib/tour';
 import { activeMenu, itemCents, personItemCount, personTotalCents, quantities } from '@/lib/totals';
 import type { MenuItem } from '@/lib/types';
@@ -39,7 +39,7 @@ export default function PersonScreen() {
   const withWaiting = useWithPending(event);
   const addWaiting = usePending((state) => state.add);
   const addOrder = useStore((state) => state.addOrder);
-  const tallyMode = useStore((state) => state.tallyMode);
+  const hideAmounts = useHideAmounts();
   const setCorrectionPin = useStore((state) => state.setCorrectionPin);
   const bottomInset = useBottomInset();
 
@@ -135,7 +135,7 @@ export default function PersonScreen() {
               {formatCents(item.priceCents)}
               {/* De prijs van het drankje staat op de kaart; wat deze persoon
                   er al van heeft kost is wat niet iedereen hoeft te zien. */}
-              {quantity > 0 && !tallyMode ? ` · ${formatCents(spent[item.id] ?? 0)}` : ''}
+              {quantity > 0 && !hideAmounts ? ` · ${formatCents(spent[item.id] ?? 0)}` : ''}
             </Text>
           </View>
 
@@ -186,7 +186,7 @@ export default function PersonScreen() {
             {/* Shrinks first, so a larger phone text size cannot push the amount
                 into it. The amount itself must never wrap. */}
             <View style={{ gap: 2, flexShrink: 1 }}>
-              {tallyMode ? null : (
+              {hideAmounts ? null : (
                 <Text style={{ color: theme.textDim, fontSize: 14 }}>
                   {personItemCount(counted, person.id)} consumpties
                 </Text>
@@ -202,7 +202,7 @@ export default function PersonScreen() {
               ) : null}
             </View>
             <Text numberOfLines={1} style={{ color: theme.text, fontSize: 24, fontWeight: '800' }}>
-              {tallyMode
+              {hideAmounts
                 ? `${personItemCount(counted, person.id)} consumpties`
                 : formatCents(personTotalCents(counted, person.id))}
             </Text>
