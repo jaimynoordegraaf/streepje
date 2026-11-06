@@ -360,7 +360,8 @@ export const useStore = create<StoreState>()(
           removedAt: null,
           removedBy: null,
           memberId: null,
-          billing: 'tonight' as Billing,
+          // Op een lopende rekening gaat alles op de factuur.
+          billing: 'invoice' as Billing,
           guestOf: null,
         }));
 
@@ -392,8 +393,9 @@ export const useStore = create<StoreState>()(
 
         const event: AppEvent = {
           id: newId(),
-          name: 'Voorbeeldavond',
-          kind: 'event',
+          name: 'Voorbeeldrekening',
+          // Een lopende rekening, want zo opent de app echt op de iPad.
+          kind: 'tab',
           createdAt: now,
           people,
           menu,

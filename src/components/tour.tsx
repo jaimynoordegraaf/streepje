@@ -72,14 +72,8 @@ function pathFor(screen: TourScreen, eventId: string, personId: string): string 
   switch (screen) {
     case 'event':
       return `/event/${eventId}`;
-    case 'lists':
-      return '/lists';
     case 'person':
       return `/event/${eventId}/person/${personId}`;
-    case 'totals':
-      return `/event/${eventId}/totals`;
-    case 'log':
-      return `/event/${eventId}/log`;
   }
 }
 
@@ -139,20 +133,11 @@ export function TourOverlay() {
       case 'event':
         router.replace({ pathname: '/event/[id]', params: { id: demoEventId } });
         break;
-      case 'lists':
-        router.replace('/lists');
-        break;
       case 'person':
         router.replace({
           pathname: '/event/[id]/person/[personId]',
           params: { id: demoEventId, personId: demoPersonId },
         });
-        break;
-      case 'totals':
-        router.replace({ pathname: '/event/[id]/totals', params: { id: demoEventId } });
-        break;
-      case 'log':
-        router.replace({ pathname: '/event/[id]/log', params: { id: demoEventId } });
         break;
     }
   }, [active, step, demoEventId, demoPersonId, pathname, router]);

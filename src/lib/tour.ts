@@ -2,17 +2,20 @@
  * De rondleiding: wat hij vertelt, waar hij staat, en waar hij naar wijst.
  *
  * Streepje wordt achter de bar doorgegeven aan iemand die hem nog nooit heeft
- * gezien, en dan is turven wel duidelijk maar de rest niet: dat een lopende
- * rekening iets anders is dan een evenement, dat er een export voor de
- * penningmeester bestaat, dat corrigeren achter een code zit. Dat uitleggen
- * kostte elke keer iemand aan de bar.
+ * gezien, en dan is turven wel duidelijk maar de rest niet: hoe je een streep
+ * terugneemt, waar een rondje zit, dat al het andere achter het menu en de
+ * beheercode staat. Dat uitleggen kostte elke keer iemand aan de bar.
+ *
+ * De rondleiding is voor de barploeg en blijft daarbij: het beginscherm, een
+ * streep zetten, Rondje en het menu. Wat achter de beheercode zit (totalen,
+ * logboek, delen, instellingen) legt hij niet uit; daar komt de barploeg niet.
  *
  * De rondleiding loopt daarom door de echte schermen en wijst de echte knoppen
  * aan, in plaats van tekeningen ervan te laten zien. Dat vraagt twee dingen:
  *
  *   1. Iets om langs te lopen. Op een verse telefoon is er niets -- geen
- *      lijsten, geen namen, geen turfjes -- en de knoppen Rondje, Totalen en
- *      het logboek bestaan pas binnen een lijst. De rondleiding maakt daarom
+ *      lijsten, geen namen, geen turfjes -- en de knop Rondje bestaat pas
+ *      binnen een lijst. De rondleiding maakt daarom
  *      zelf een voorbeeldlijst (zie `createDemoEvent` in store.ts) en ruimt
  *      die achteraf op. Die lijst gaat nooit de opslag in en nooit naar de
  *      server; waarom en hoe staat bij `demo` in types.ts.
@@ -34,7 +37,7 @@ import { useStore } from './store';
 export type Anchor = { x: number; y: number; width: number; height: number };
 
 /** De schermen waar de rondleiding langsgaat. */
-export type TourScreen = 'event' | 'lists' | 'person' | 'totals' | 'log';
+export type TourScreen = 'event' | 'person';
 
 export type TourStep = {
   screen: TourScreen;
@@ -54,14 +57,11 @@ export type TourStep = {
  * stap zonder spotlight oplevert.
  */
 export const ANCHOR = {
-  list: 'list',
   person: 'person',
   item: 'item',
-  correction: 'correction',
   round: 'round',
   /** De drie puntjes in de kop van een lijst. */
   menu: 'menu',
-  exports: 'exports',
 } as const;
 
 /**
@@ -75,19 +75,13 @@ export const STEPS: TourStep[] = [
     screen: 'event',
     anchor: ANCHOR.person,
     title: 'Je streeplijst',
-    body: 'Zo opent de app ook: meteen in je lijst, met iedereen die meedoet. Leden haal je in één keer uit de lopende rekening, gasten voeg je los toe. Tik op een naam om voor die persoon te turven. Dit is een voorbeeld; hij verdwijnt zodra de rondleiding klaar is.',
+    body: 'Zo opent de app ook: meteen in je lijst, met iedereen die meedoet. Tik op een naam om voor die persoon te turven. Dit is een voorbeeld; hij verdwijnt zodra de rondleiding klaar is.',
   },
   {
     screen: 'person',
     anchor: ANCHOR.item,
     title: 'Turven is één tik',
-    body: 'Tik op het plusje en de consumptie staat erop, tegen de prijs van dat moment. Misgetikt? Onderin staat een paar seconden Ongedaan maken, ook als je al bij de volgende bent. Daarna staat de tik vast. Elke tik is een eigen regel, dus twee telefoons kunnen tegelijk turven zonder elkaar te overschrijven.',
-  },
-  {
-    screen: 'person',
-    anchor: ANCHOR.correction,
-    title: 'De correctiecode',
-    body: 'Turven mag iedereen, een turf weghalen niet. Staat een tik eenmaal vast, dan kan dat alleen op een beheertelefoon en alleen met de correctiecode, want weghalen haalt geld van iemands rekening.',
+    body: 'Tik op het vinkje en de consumptie staat erop, tegen de prijs van dat moment. Misgetikt? Onderin staat een paar seconden Ongedaan maken, ook als je al bij de volgende bent. Staat de tik eenmaal vast, dan haalt alleen een beheerder hem weg, met de correctiecode.',
   },
   {
     screen: 'event',
@@ -98,26 +92,8 @@ export const STEPS: TourStep[] = [
   {
     screen: 'event',
     anchor: ANCHOR.menu,
-    title: 'Al het andere zit achter het menu',
-    body: 'Achter de drie puntjes staat alles wat geen turven is: Delen, Beheer, het logboek, je andere lijsten en de Instellingen. Deel je de lijst, dan turft elke telefoon die de code scant erin mee. De groep voor de barploeg staat onder Instellingen.',
-  },
-  {
-    screen: 'lists',
-    anchor: ANCHOR.list,
-    title: 'Je andere lijsten',
-    body: 'Via Alle lijsten in het menu kom je hier: een lopende rekening voor de gewone baravonden, waar alles op de factuur van de penningmeester gaat, of een evenement voor een feest of een weekend weg.',
-  },
-  {
-    screen: 'totals',
-    anchor: ANCHOR.exports,
-    title: 'Totalen en exporteren',
-    body: 'Hier zie je wat iedereen heeft gehad en vink je af wie heeft betaald. De hele lijst gaat als CSV-bestand naar buiten, en voor de penningmeester is er een eigen export.',
-  },
-  {
-    screen: 'log',
-    anchor: null,
-    title: 'Het logboek',
-    body: 'Elke tik blijft staan: wie wat turfde, voor wie, van welke telefoon en wanneer. Klopt een bedrag niet, dan zie je hier waar het is misgegaan. Je vindt het logboek in het menu.',
+    title: 'Een naam erbij, en de rest',
+    body: 'Achter de drie puntjes zet je bovenaan een naam erbij: een lid, een gast of Onbekend. Alles daaronder (totalen, logboek, beheer, delen, andere lijsten en instellingen) is voor de beheerder en vraagt de beheercode.',
   },
 ];
 
@@ -211,11 +187,6 @@ export function useAnchor(id: string | undefined) {
   }, [id, active, step, measure]);
 
   return { ref, onLayout: measure, collapsable: false } as const;
-}
-
-/** Of de rondleiding op dit moment naar deze knop wijst. */
-export function useTourFocus(id: string): boolean {
-  return useTour((state) => state.active && STEPS[state.step]?.anchor === id);
 }
 
 /** Start de rondleiding, met een verse voorbeeldlijst om langs te lopen. */

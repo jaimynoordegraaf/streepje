@@ -115,8 +115,8 @@ export default function PersonScreen() {
     setAsking(null);
   };
 
-  // Waar de rondleiding turven en corrigeren op laat zien: het eerste item
-  // van het menu, dat bovenaan het eerste blok staat.
+  // Waar de rondleiding turven op laat zien: het eerste item van het menu,
+  // dat bovenaan het eerste blok staat.
   const firstItemId = sections[0]?.data[0]?.id;
 
   const renderItem = ({ item }: { item: MenuItem }) => {
@@ -141,7 +141,6 @@ export default function PersonScreen() {
 
           <StepButton
             icon={(color, size) => <CrossIcon size={size} color={color} />}
-            tourId={shown ? ANCHOR.correction : undefined}
             onPress={() => requestRemoval(item)}
             disabled={event.closed || fixed === 0}
           />

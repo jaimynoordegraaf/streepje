@@ -5,7 +5,9 @@
  * rekening waar de app mee opent, en op `event/[id]` voor elke lijst die je
  * vanuit het overzicht opent. Dezelfde inhoud, dus één component.
  *
- * Alles wat geen turven is zit achter het menu in de kop (zie menu.tsx).
+ * Alles wat geen turven is zit achter het menu in de kop (zie menu.tsx): wat de
+ * barploeg af en toe nodig heeft bovenaan, de rest achter de beheercode. Op het
+ * scherm zelf staat alleen de lijst en onderin Rondje.
  */
 
 import { Stack, useRouter } from 'expo-router';
@@ -14,7 +16,6 @@ import { FlatList, PixelRatio, Pressable, View, useWindowDimensions } from 'reac
 
 import { Text } from '@/components/text';
 
-import { CartIcon } from '@/components/icons';
 import {
   DropdownMenu,
   MenuButton,
@@ -23,7 +24,6 @@ import {
   type DropdownItem,
 } from '@/components/menu';
 import { GuestModal, MemberPickerModal, PromptModal } from '@/components/modals';
-import { useNewList } from '@/components/new-list';
 import { Tally } from '@/components/tally';
 import { TourTarget } from '@/components/tour';
 import { BottomBar, Button, Card, EmptyState, Screen } from '@/components/ui';
@@ -173,8 +173,7 @@ export function ListScreen({ id }: { id: string }) {
   const [adding, setAdding] = useState<'name' | 'guest' | 'members' | null>(null);
   const { status, pending, detailsPending } = useEventSync(event);
   const menu = useDropdown();
-  const newList = useNewList();
-  const globalItems = useGlobalItems(newList.start);
+  const globalItems = useGlobalItems();
 
   // De lopende rekening die je opent is de volgende keer waar de app mee
   // opent. De voorbeeldlijst van de rondleiding is geen rekening en telt niet.
@@ -218,21 +217,46 @@ export function ListScreen({ id }: { id: string }) {
 
   const sharing = shareState(Boolean(event.share), status, pending, detailsPending);
 
-  // Wat niet turven is, in de volgorde waarin je het zoekt: eerst wat bij
-  // déze lijst hoort, dan wat voor de hele telefoon geldt.
+  // Wat niet turven is, in twee blokken. Eerst wat de barploeg af en toe nodig
+  // heeft: namen erbij zetten. Dat stond onder de lijst, maar wordt bijna niet
+  // gebruikt en nam daar plek in. Daaronder wat geld of instellingen raakt, en
+  // dat vraagt de beheercode. Op een afgesloten lijst kan er niemand bij.
+  const adders: DropdownItem[] = event.closed
+    ? []
+    : tab
+    ? [
+        { label: 'Lid toevoegen', onPress: () => setAdding('name') },
+        { label: 'Onbekend', onPress: addUnknown },
+      ]
+    : [
+        { label: 'Leden', onPress: () => setAdding('members') },
+        { label: 'Gast', onPress: () => setAdding('guest') },
+        { label: 'Onbekend', onPress: addUnknown },
+      ];
+
   const items: DropdownItem[] = [
+    ...adders.map((item, index) => (index === 0 ? { ...item, heading: 'Voor de bar' } : item)),
     {
-      label: event.share ? 'Delen beheren' : 'Delen',
-      hint: sharing.label,
-      onPress: () => router.push({ pathname: '/event/[id]/share', params: { id } }),
-    },
-    {
-      label: 'Beheer',
-      onPress: () => router.push({ pathname: '/event/[id]/setup', params: { id } }),
+      label: 'Totalen en betalen',
+      onPress: () => router.push({ pathname: '/event/[id]/totals', params: { id } }),
+      heading: 'Achter de beheercode',
+      locked: true,
     },
     {
       label: 'Logboek',
       onPress: () => router.push({ pathname: '/event/[id]/log', params: { id } }),
+      locked: true,
+    },
+    {
+      label: 'Beheer',
+      onPress: () => router.push({ pathname: '/event/[id]/setup', params: { id } }),
+      locked: true,
+    },
+    {
+      label: event.share ? 'Delen beheren' : 'Delen',
+      hint: sharing.label,
+      onPress: () => router.push({ pathname: '/event/[id]/share', params: { id } }),
+      locked: true,
     },
     ...globalItems,
   ];
@@ -244,15 +268,8 @@ export function ListScreen({ id }: { id: string }) {
           <Button
             title="Rondje"
             tourId={ANCHOR.round}
-            variant="secondary"
             disabled={event.closed}
             onPress={() => router.push({ pathname: '/event/[id]/round', params: { id } })}
-            style={{ flex: 1 }}
-          />
-          <Button
-            title="Totalen"
-            icon={(color, size) => <CartIcon size={size} color={color} />}
-            onPress={() => router.push({ pathname: '/event/[id]/totals', params: { id } })}
             style={{ flex: 1 }}
           />
         </BottomBar>
@@ -267,7 +284,6 @@ export function ListScreen({ id }: { id: string }) {
       />
 
       <DropdownMenu top={menu.top} items={items} onClose={menu.close} />
-      {newList.modal}
 
       <FlatList
         data={people}
@@ -296,37 +312,6 @@ export function ListScreen({ id }: { id: string }) {
             )}
           </View>
         }
-        ListFooterComponent={
-          event.closed ? null : tab ? (
-            <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
-              <Button
-                title="Lid toevoegen"
-                variant="secondary"
-                onPress={() => setAdding('name')}
-                style={{ flex: 1 }}
-              />
-              <Button title="Onbekend" variant="secondary" onPress={addUnknown} style={{ flex: 1 }} />
-            </View>
-          ) : (
-            <View style={{ gap: space.sm, marginTop: space.sm }}>
-              <View style={{ flexDirection: 'row', gap: space.sm }}>
-                <Button
-                  title="Leden"
-                  variant="secondary"
-                  onPress={() => setAdding('members')}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  title="Gast"
-                  variant="secondary"
-                  onPress={() => setAdding('guest')}
-                  style={{ flex: 1 }}
-                />
-              </View>
-              <Button title="Onbekend" variant="secondary" onPress={addUnknown} />
-            </View>
-          )
-        }
         ListEmptyComponent={
           <EmptyState
             title={tab ? 'Nog geen leden' : 'Nog niemand toegevoegd'}
@@ -334,8 +319,8 @@ export function ListScreen({ id }: { id: string }) {
               event.closed
                 ? undefined
                 : tab
-                ? 'Voeg de leden van de groep toe en tik daarna op een naam om te turven. Alles gaat op de factuur.'
-                : 'Kies leden uit de lopende rekening of voeg een gast toe, en tik daarna op een naam om te turven.'
+                ? 'Voeg via het menu (de drie puntjes) de leden van de groep toe en tik daarna op een naam om te turven. Alles gaat op de factuur.'
+                : 'Kies via het menu (de drie puntjes) leden uit de lopende rekening of voeg een gast toe, en tik daarna op een naam om te turven.'
             }
           />
         }

@@ -160,6 +160,116 @@ export default function SettingsScreen() {
 
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: 48 + bottomInset }}>
         <View style={{ gap: space.sm }}>
+          <SectionTitle>Deze telefoon</SectionTitle>
+          <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+            De naam die de andere telefoons zien bij een gedeelde lijst, zodat duidelijk is welke
+            telefoon meetelt. Bijvoorbeeld je eigen naam of &quot;Bar&quot;.
+          </Text>
+          <Card style={{ paddingVertical: space.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+              <Text
+                style={{
+                  flex: 1,
+                  color: deviceName ? theme.text : theme.textDim,
+                  fontSize: 16,
+                  fontWeight: '600',
+                }}>
+                {deviceName ?? 'Nog geen naam'}
+              </Text>
+              <Pressable onPress={() => setNamingDevice(true)} hitSlop={8}>
+                <Text style={{ color: theme.link, fontWeight: '600' }}>
+                  {deviceName ? 'Wijzigen' : 'Instellen'}
+                </Text>
+              </Pressable>
+            </View>
+          </Card>
+          {deviceName && sharedCount > 0 ? (
+            <Text style={{ color: theme.textDim, fontSize: 12 }}>
+              Een wijziging geldt ook voor {sharedCount === 1 ? 'de gedeelde lijst' : `de ${sharedCount} gedeelde lijsten`} waar deze telefoon al aan meedoet.
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={{ gap: space.sm, marginTop: space.md }}>
+          <SectionTitle>Weergave</SectionTitle>
+          <Card style={{ gap: space.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+              <Text style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '600' }}>
+                Streepjes in plaats van bedragen
+              </Text>
+              <Switch
+                value={tallyMode}
+                onValueChange={requestTallyMode}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                accessibilityLabel="Streepjes in plaats van bedragen"
+              />
+            </View>
+            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+              Bij de namen staan streepjes zoals op papier, geen bedragen, zodat niemand meekijkt
+              hoeveel iemand heeft. Totalen en de exports laten de bedragen wel zien. Geldt alleen
+              voor deze telefoon. Omzetten vraagt de correctiecode.
+            </Text>
+          </Card>
+        </View>
+
+        {isSyncConfigured ? (
+          <View style={{ gap: space.sm, marginTop: space.md }}>
+            <SectionTitle>Groep</SectionTitle>
+            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+              Voor de barploeg: één code voor de hele groep, één keer scannen. Daarna verschijnt
+              elke lijst van de groep vanzelf op deze telefoon, zonder losse codes per lijst.
+              Corrigeren en betalingen blijven voorbehouden aan beheertelefoons.
+            </Text>
+
+            {group ? (
+              <>
+                <Card style={{ gap: space.sm }}>
+                  <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>
+                    {group.name}
+                  </Text>
+                  <Text style={{ color: theme.textDim, fontSize: 13 }}>
+                    Groepscode, voor wie er nog bij moet
+                  </Text>
+                  <Text
+                    style={{
+                      color: theme.text,
+                      fontSize: 28,
+                      fontWeight: '700',
+                      letterSpacing: 5,
+                    }}>
+                    {group.joinCode}
+                  </Text>
+                </Card>
+                <Button
+                  title={busy ? 'Bezig…' : 'Groep verlaten'}
+                  variant="danger"
+                  disabled={busy}
+                  onPress={confirmLeaveGroup}
+                />
+              </>
+            ) : (
+              <>
+                <Button
+                  title="Deelnemen met groepscode"
+                  disabled={busy}
+                  onPress={() => setJoiningGroup(true)}
+                />
+                <Button
+                  title="Nieuwe groep aanmaken"
+                  variant="secondary"
+                  disabled={busy}
+                  onPress={() => setMakingGroup(true)}
+                />
+                <Text style={{ color: theme.textDim, fontSize: 12, lineHeight: 17 }}>
+                  Eén iemand maakt de groep aan en geeft de code door; de rest neemt deel. Iedereen
+                  met die code kan alle lijsten van de groep zien en erin turven.
+                </Text>
+              </>
+            )}
+          </View>
+        ) : null}
+
+        <View style={{ gap: space.sm, marginTop: space.md }}>
           <SectionTitle>Standaardmenu</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
             Elk nieuw evenement begint met een kopie van deze lijst, zodat je je drankjes en prijzen
@@ -289,116 +399,6 @@ export default function SettingsScreen() {
 
           <Button title="Naam toevoegen" variant="secondary" onPress={() => setAddingPerson(true)} />
         </View>
-
-        <View style={{ gap: space.sm, marginTop: space.md }}>
-          <SectionTitle>Deze telefoon</SectionTitle>
-          <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-            De naam die de andere telefoons zien bij een gedeelde lijst, zodat duidelijk is welke
-            telefoon meetelt. Bijvoorbeeld je eigen naam of &quot;Bar&quot;.
-          </Text>
-          <Card style={{ paddingVertical: space.md }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-              <Text
-                style={{
-                  flex: 1,
-                  color: deviceName ? theme.text : theme.textDim,
-                  fontSize: 16,
-                  fontWeight: '600',
-                }}>
-                {deviceName ?? 'Nog geen naam'}
-              </Text>
-              <Pressable onPress={() => setNamingDevice(true)} hitSlop={8}>
-                <Text style={{ color: theme.link, fontWeight: '600' }}>
-                  {deviceName ? 'Wijzigen' : 'Instellen'}
-                </Text>
-              </Pressable>
-            </View>
-          </Card>
-          {deviceName && sharedCount > 0 ? (
-            <Text style={{ color: theme.textDim, fontSize: 12 }}>
-              Een wijziging geldt ook voor {sharedCount === 1 ? 'de gedeelde lijst' : `de ${sharedCount} gedeelde lijsten`} waar deze telefoon al aan meedoet.
-            </Text>
-          ) : null}
-        </View>
-
-        <View style={{ gap: space.sm, marginTop: space.md }}>
-          <SectionTitle>Weergave</SectionTitle>
-          <Card style={{ gap: space.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-              <Text style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '600' }}>
-                Streepjes in plaats van bedragen
-              </Text>
-              <Switch
-                value={tallyMode}
-                onValueChange={requestTallyMode}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                accessibilityLabel="Streepjes in plaats van bedragen"
-              />
-            </View>
-            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-              Bij de namen staan streepjes zoals op papier, geen bedragen, zodat niemand meekijkt
-              hoeveel iemand heeft. Totalen en de exports laten de bedragen wel zien. Geldt alleen
-              voor deze telefoon. Omzetten vraagt de correctiecode.
-            </Text>
-          </Card>
-        </View>
-
-        {isSyncConfigured ? (
-          <View style={{ gap: space.sm, marginTop: space.md }}>
-            <SectionTitle>Groep</SectionTitle>
-            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-              Voor de barploeg: één code voor de hele groep, één keer scannen. Daarna verschijnt
-              elke lijst van de groep vanzelf op deze telefoon, zonder losse codes per lijst.
-              Corrigeren en betalingen blijven voorbehouden aan beheertelefoons.
-            </Text>
-
-            {group ? (
-              <>
-                <Card style={{ gap: space.sm }}>
-                  <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>
-                    {group.name}
-                  </Text>
-                  <Text style={{ color: theme.textDim, fontSize: 13 }}>
-                    Groepscode, voor wie er nog bij moet
-                  </Text>
-                  <Text
-                    style={{
-                      color: theme.text,
-                      fontSize: 28,
-                      fontWeight: '700',
-                      letterSpacing: 5,
-                    }}>
-                    {group.joinCode}
-                  </Text>
-                </Card>
-                <Button
-                  title={busy ? 'Bezig…' : 'Groep verlaten'}
-                  variant="danger"
-                  disabled={busy}
-                  onPress={confirmLeaveGroup}
-                />
-              </>
-            ) : (
-              <>
-                <Button
-                  title="Deelnemen met groepscode"
-                  disabled={busy}
-                  onPress={() => setJoiningGroup(true)}
-                />
-                <Button
-                  title="Nieuwe groep aanmaken"
-                  variant="secondary"
-                  disabled={busy}
-                  onPress={() => setMakingGroup(true)}
-                />
-                <Text style={{ color: theme.textDim, fontSize: 12, lineHeight: 17 }}>
-                  Eén iemand maakt de groep aan en geeft de code door; de rest neemt deel. Iedereen
-                  met die code kan alle lijsten van de groep zien en erin turven.
-                </Text>
-              </>
-            )}
-          </View>
-        ) : null}
 
         {isSyncConfigured ? (
           <View style={{ gap: space.sm, marginTop: space.md }}>

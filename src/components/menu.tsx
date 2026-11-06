@@ -9,6 +9,10 @@
  * een nieuwe winkelversie. Dit is gewoon een Modal, en een Modal doet op beide
  * platforms hetzelfde, inclusief de terugknop van Android die hem sluit.
  *
+ * Het menu heeft twee lagen. Wat de barploeg nodig heeft staat bovenaan en is
+ * open. Alles eronder (totalen, logboek, beheer, delen, alle lijsten,
+ * instellingen) zit achter de beheercode: zie `gate` in DropdownMenu.
+ *
  * De staat van het menu (open of dicht) hoort in het scherm, niet in de kop.
  * Een `headerRight: () => <...>` is bij elke render van het scherm een nieuw
  * onderdeel, en een onderdeel dat zichzelf steeds opnieuw opbouwt vergeet dat
@@ -23,6 +27,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { whenAlertClosed } from '@/components/modals';
+import { PinModal } from '@/components/pin-modal';
+import { correctionBlock, correctionsUnlocked, unlockCorrections } from '@/lib/pin';
+import { useHomeList, useStore } from '@/lib/store';
 import { useAnchor } from '@/lib/tour';
 import { radius, space, useTheme } from '@/theme';
 
@@ -33,6 +40,10 @@ export type DropdownItem = {
   onPress: () => void;
   /** Een scheidingslijn boven dit item, om groepen uit elkaar te houden. */
   separated?: boolean;
+  /** Een kopje boven dit item: het begin van een nieuw blok. Zet ook een lijn. */
+  heading?: string;
+  /** Achter de beheercode. Zie `gate` in DropdownMenu. */
+  locked?: boolean;
 };
 
 /** Open/dicht en waar het menu hangt. `top` is de onderkant van de knop. */
@@ -124,15 +135,48 @@ export function DropdownMenu({
 }) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
+  const home = useHomeList();
+  const setCorrectionPin = useStore((state) => state.setCorrectionPin);
+  // Wat er na de code geopend moet worden, en of de code nog gekozen moet worden.
+  const [asking, setAsking] = useState<{ mode: 'verify' | 'set'; open: () => void } | null>(null);
+
+  /**
+   * Het slot op het onderste blok van het menu.
+   *
+   * Het gebruikt de code die er al is: de correctiecode van de lijst waar de
+   * app mee opent, zoals de schakelaar voor streepjes in Instellingen. Er komt
+   * geen tweede code bij. Na een goede code staat alles twee minuten open (het
+   * venster van pin.ts), dus Totalen en dan Logboek vraagt maar één keer.
+   *
+   * Een telefoon die geen beheerder is van die lijst heeft geen code en komt
+   * er zonder doorheen: wat daar gevaarlijk is, weigert de database toch al.
+   * Zonder lijst valt er niets te beveiligen.
+   */
+  const gate = (open: () => void) => {
+    if (!home) return open();
+    const block = correctionBlock(home);
+    if (!block.allowed && block.reason === 'not-admin') return open();
+    if (correctionsUnlocked(home.id)) return open();
+    setAsking({ mode: !block.allowed && block.reason === 'no-pin' ? 'set' : 'verify', open });
+  };
 
   const choose = (item: DropdownItem) => {
     onClose();
     // Pas als het menu echt weg is. Een scherm of een venster openen terwijl
     // een Modal nog wegglijdt faalt op iOS stilletjes; zie whenAlertClosed.
-    whenAlertClosed(item.onPress);
+    whenAlertClosed(() => (item.locked ? gate(item.onPress) : item.onPress()));
+  };
+
+  /** De code is goed: venster sluiten, en pas daarna het scherm openen. */
+  const unlocked = () => {
+    const open = asking?.open;
+    if (home) unlockCorrections(home.id);
+    setAsking(null);
+    if (open) whenAlertClosed(open);
   };
 
   return (
+    <>
     <Modal
       visible={top !== null}
       transparent
@@ -163,10 +207,24 @@ export function DropdownMenu({
           }}>
           {items.map((item, index) => (
             <View key={item.label}>
-              {item.separated && index > 0 ? (
+              {(item.separated || item.heading) && index > 0 ? (
                 <View
                   style={{ height: 1, backgroundColor: theme.border, marginVertical: space.xs }}
                 />
+              ) : null}
+              {item.heading ? (
+                <Text
+                  style={{
+                    color: theme.textDim,
+                    fontSize: 11,
+                    fontWeight: '700',
+                    letterSpacing: 0.8,
+                    textTransform: 'uppercase',
+                    paddingHorizontal: space.lg,
+                    paddingTop: space.xs,
+                  }}>
+                  {item.heading}
+                </Text>
               ) : null}
               <Pressable
                 onPress={() => choose(item)}
@@ -190,29 +248,44 @@ export function DropdownMenu({
         </View>
       </Pressable>
     </Modal>
+
+    <PinModal
+      visible={asking !== null && home !== undefined}
+      mode={asking?.mode ?? 'verify'}
+      eventId={home?.id ?? ''}
+      record={home?.correctionPin}
+      title="Correctiecode"
+      explanation={
+        asking?.mode === 'set'
+          ? 'Dit deel van het menu is alleen voor de beheerder en vraagt een code. Er is nog geen code voor deze lijst: kies er een. Die is ook nodig om een streep weg te halen. Bewaar hem goed: hij staat alleen op deze telefoon en een vergeten code is niet te herstellen.'
+          : 'Voer de code in om verder te gaan. Dit deel van het menu is alleen voor de beheerder.'
+      }
+      onCancel={() => setAsking(null)}
+      onVerified={unlocked}
+      onSet={(record) => {
+        if (home) setCorrectionPin(home.id, record);
+        unlocked();
+      }}
+    />
+    </>
   );
 }
 
 /**
- * Het deel van het menu dat overal hetzelfde is: naar de andere lijsten, een
- * nieuwe lijst, deelnemen aan een gedeelde, en de instellingen.
+ * Het deel van het menu dat overal hetzelfde is: naar de andere lijsten en de
+ * instellingen. Beide achter de beheercode.
  *
- * `hideLists` voor het overzicht zelf, dat er al staat.
+ * Nieuwe lijst en Deelnemen met code staan hier niet meer: ze zitten op Alle
+ * lijsten, onderin. `hideLists` voor het lege beginscherm, waar nog geen lijst
+ * is om naartoe te gaan.
  */
-export function useGlobalItems(
-  openNewList: () => void,
-  { hideLists = false }: { hideLists?: boolean } = {}
-): DropdownItem[] {
+export function useGlobalItems({ hideLists = false }: { hideLists?: boolean } = {}): DropdownItem[] {
   const router = useRouter();
   const items: DropdownItem[] = [];
 
   if (!hideLists) {
-    items.push({ label: 'Alle lijsten', onPress: () => router.push('/lists'), separated: true });
+    items.push({ label: 'Alle lijsten', onPress: () => router.push('/lists'), locked: true });
   }
-  items.push(
-    { label: 'Nieuwe lijst', onPress: openNewList, separated: hideLists },
-    { label: 'Deelnemen met code', onPress: () => router.push('/join') },
-    { label: 'Instellingen', onPress: () => router.push('/settings'), separated: true }
-  );
+  items.push({ label: 'Instellingen', onPress: () => router.push('/settings'), locked: true });
   return items;
 }

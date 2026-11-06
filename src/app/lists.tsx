@@ -5,12 +5,10 @@ import { FlatList, Pressable, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { useNewList } from '@/components/new-list';
-import { TourTarget } from '@/components/tour';
 import { BottomBar, Button, Card, EmptyState, HeaderButton, Screen } from '@/components/ui';
 import { formatDate } from '@/lib/export';
 import { formatCents } from '@/lib/money';
 import { useStore } from '@/lib/store';
-import { ANCHOR } from '@/lib/tour';
 import { useGroupSync } from '@/lib/use-group-sync';
 import {
   activePeople,
@@ -106,17 +104,15 @@ export default function ListsScreen() {
   // The season tab is where most evenings happen, so it sits at the top, and
   // closed events are finished, so they sink to the bottom. Within each group
   // the order is the store's: newest first. De voorbeeldlijst van de
-  // rondleiding gaat voor alles, anders staat hij bij veel lijsten buiten
-  // beeld op het moment dat de rondleiding ernaar wijst.
-  const ordered = useMemo(
-    () => [
-      ...events.filter((event) => event.demo),
-      ...events.filter((event) => event.kind === 'tab'),
-      ...events.filter((event) => event.kind !== 'tab' && !event.closed && !event.demo),
-      ...events.filter((event) => event.kind !== 'tab' && event.closed),
-    ],
-    [events]
-  );
+  // rondleiding staat hier niet: de rondleiding komt hier niet langs.
+  const ordered = useMemo(() => {
+    const real = events.filter((event) => !event.demo);
+    return [
+      ...real.filter((event) => event.kind === 'tab'),
+      ...real.filter((event) => event.kind !== 'tab' && !event.closed),
+      ...real.filter((event) => event.kind !== 'tab' && event.closed),
+    ];
+  }, [events]);
 
   return (
     <Screen
@@ -152,18 +148,12 @@ export default function ListsScreen() {
             hint="Maak een lopende rekening voor de gewone baravonden, of een evenement voor een feest of een weekend weg, en begin met turven."
           />
         }
-        renderItem={({ item }) => {
-          const row = (
-            <EventRow
-              event={item}
-              onPress={() => router.push({ pathname: '/event/[id]', params: { id: item.id } })}
-            />
-          );
-          // De rondleiding wijst de voorbeeldlijst aan. Op de voorbeeldlijst
-          // zelf en niet op de bovenste rij: de eigen lijsten van deze
-          // telefoon staan ook in dit overzicht.
-          return item.demo ? <TourTarget id={ANCHOR.list}>{row}</TourTarget> : row;
-        }}
+        renderItem={({ item }) => (
+          <EventRow
+            event={item}
+            onPress={() => router.push({ pathname: '/event/[id]', params: { id: item.id } })}
+          />
+        )}
       />
 
       {newList.modal}

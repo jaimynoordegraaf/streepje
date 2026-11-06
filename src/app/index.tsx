@@ -6,7 +6,6 @@ import { Text } from '@/components/text';
 
 import { ListScreen } from '@/components/list-screen';
 import { DropdownMenu, MenuButton, useDropdown, useGlobalItems } from '@/components/menu';
-import { useNewList } from '@/components/new-list';
 import { Button, Screen } from '@/components/ui';
 import { useHomeList, useStore } from '@/lib/store';
 import { useStartTour, useTour } from '@/lib/tour';
@@ -28,8 +27,7 @@ function NoListScreen() {
   const createEvent = useStore((state) => state.createEvent);
   const { shareIntoGroup } = useGroupSync();
   const menu = useDropdown();
-  const newList = useNewList();
-  const items = useGlobalItems(newList.start, { hideLists: eventCount === 0 });
+  const items = useGlobalItems({ hideLists: eventCount === 0 });
 
   return (
     <Screen>
@@ -79,7 +77,6 @@ function NoListScreen() {
       </View>
 
       <DropdownMenu top={menu.top} items={items} onClose={menu.close} />
-      {newList.modal}
     </Screen>
   );
 }

@@ -209,6 +209,38 @@ export default function SetupScreen() {
 
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: 48 + bottomInset }}>
         <View style={{ gap: space.sm }}>
+          <SectionTitle>Correctiecode</SectionTitle>
+          <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+            {isAdminDevice(event)
+              ? 'Zonder deze code kan niemand op deze telefoon een turfje weghalen. Turven zelf blijft gewoon één tik. Dezelfde code opent ook het onderste deel van het menu: Totalen, Logboek, Beheer, Delen, Alle lijsten en Instellingen. De code staat alleen op deze telefoon, elke beheertelefoon heeft zijn eigen, en een vergeten code is niet te herstellen: schrijf hem op.'
+              : 'Turfjes weghalen kan alleen op een beheertelefoon. Op deze telefoon kun je wel turven, maar niets weghalen. Een beheerder kan deze telefoon beheerder maken onder Delen.'}
+          </Text>
+
+          {isAdminDevice(event) ? (
+            <Card style={{ gap: space.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '600' }}>
+                  {event.correctionPin ? 'Ingesteld' : 'Nog niet ingesteld'}
+                </Text>
+                <Text
+                  style={{
+                    color: event.correctionPin ? theme.good : theme.danger,
+                    fontSize: 13,
+                    fontWeight: '700',
+                  }}>
+                  {event.correctionPin ? 'BEVEILIGD' : 'ONBEVEILIGD'}
+                </Text>
+              </View>
+              <Button
+                title={event.correctionPin ? 'Code wijzigen' : 'Code instellen'}
+                variant="secondary"
+                onPress={() => setPinStep(event.correctionPin ? 'change' : 'set')}
+              />
+            </Card>
+          ) : null}
+        </View>
+
+        <View style={{ gap: space.sm }}>
           <SectionTitle>Evenement</SectionTitle>
           <Card>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
@@ -220,6 +252,29 @@ export default function SetupScreen() {
               </Pressable>
             </View>
           </Card>
+        </View>
+
+        <View style={{ gap: space.sm }}>
+          <SectionTitle>Menu voor dit evenement</SectionTitle>
+          <Text style={{ color: theme.textDim, fontSize: 13, marginBottom: space.xs }}>
+            {isAdminDevice(event)
+              ? 'Prijzen hier gelden alleen voor dit evenement. Een nieuwe prijs geldt voor wat je vanaf nu turft; wat al geturfd is houdt zijn prijs.'
+              : 'Alleen een beheertelefoon kan het menu en de prijzen aanpassen.'}
+          </Text>
+          <MenuEditor
+            items={event.menu}
+            readOnly={!isAdminDevice(event)}
+            onAdd={(draft) => addItem(id, draft)}
+            onUpdate={(itemId, patch) => updateItem(id, itemId, patch)}
+            onRemove={(itemId) => removeItem(id, itemId)}
+            removeWarning={(item) => {
+              const count = loggedCount(item.id);
+              // Removing only hides the item: turfs already made keep counting.
+              return count > 0
+                ? `${count} keer geturfd. Die turfjes blijven meetellen; het item verdwijnt alleen van het menu.`
+                : null;
+            }}
+          />
         </View>
 
         <View style={{ gap: space.sm }}>
@@ -322,74 +377,6 @@ export default function SetupScreen() {
               onPress={() => setPickingSaved(true)}
             />
           ) : null}
-        </View>
-
-        <View style={{ gap: space.sm }}>
-          <SectionTitle>Menu voor dit evenement</SectionTitle>
-          <Text style={{ color: theme.textDim, fontSize: 13, marginBottom: space.xs }}>
-            {isAdminDevice(event)
-              ? 'Prijzen hier gelden alleen voor dit evenement. Een nieuwe prijs geldt voor wat je vanaf nu turft; wat al geturfd is houdt zijn prijs.'
-              : 'Alleen een beheertelefoon kan het menu en de prijzen aanpassen.'}
-          </Text>
-          <MenuEditor
-            items={event.menu}
-            readOnly={!isAdminDevice(event)}
-            onAdd={(draft) => addItem(id, draft)}
-            onUpdate={(itemId, patch) => updateItem(id, itemId, patch)}
-            onRemove={(itemId) => removeItem(id, itemId)}
-            removeWarning={(item) => {
-              const count = loggedCount(item.id);
-              // Removing only hides the item: turfs already made keep counting.
-              return count > 0
-                ? `${count} keer geturfd. Die turfjes blijven meetellen; het item verdwijnt alleen van het menu.`
-                : null;
-            }}
-          />
-        </View>
-
-        <View style={{ gap: space.sm }}>
-          <SectionTitle>Correctiecode</SectionTitle>
-          <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-            {isAdminDevice(event)
-              ? 'Zonder deze code kan niemand op deze telefoon een turfje weghalen. Turven zelf blijft gewoon één tik. De code staat alleen op deze telefoon: elke beheertelefoon heeft zijn eigen.'
-              : 'Turfjes weghalen kan alleen op een beheertelefoon. Op deze telefoon kun je wel turven, maar niets weghalen. Een beheerder kan deze telefoon beheerder maken onder Delen.'}
-          </Text>
-
-          {isAdminDevice(event) ? (
-            <Card style={{ gap: space.md }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '600' }}>
-                  {event.correctionPin ? 'Ingesteld' : 'Nog niet ingesteld'}
-                </Text>
-                <Text
-                  style={{
-                    color: event.correctionPin ? theme.good : theme.danger,
-                    fontSize: 13,
-                    fontWeight: '700',
-                  }}>
-                  {event.correctionPin ? 'BEVEILIGD' : 'ONBEVEILIGD'}
-                </Text>
-              </View>
-              <Button
-                title={event.correctionPin ? 'Code wijzigen' : 'Code instellen'}
-                variant="secondary"
-                onPress={() => setPinStep(event.correctionPin ? 'change' : 'set')}
-              />
-            </Card>
-          ) : null}
-        </View>
-
-        <View style={{ gap: space.sm }}>
-          <SectionTitle>Logboek</SectionTitle>
-          <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-            Wie wat heeft geturfd, op welke telefoon en hoe laat. Om na te kijken waar een bedrag
-            vandaan komt, of wat er is weggehaald.
-          </Text>
-          <Button
-            title="Logboek bekijken"
-            variant="secondary"
-            onPress={() => router.push({ pathname: '/event/[id]/log', params: { id } })}
-          />
         </View>
 
         <View style={{ gap: space.sm }}>
