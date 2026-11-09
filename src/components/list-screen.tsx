@@ -32,9 +32,9 @@ import { formatCents } from '@/lib/money';
 import { useWithPending } from '@/lib/pending';
 import { useEvent, useStore } from '@/lib/store';
 import { ANCHOR } from '@/lib/tour';
+import { useListOrder } from '@/lib/use-list-order';
 import { useEventSync, type SyncStatus } from '@/lib/use-sync';
 import {
-  activePeople,
   eventInvoiceCents,
   eventOutstandingCents,
   eventPaidCents,
@@ -175,6 +175,9 @@ export function ListScreen({ id }: { id: string }) {
   const { status, pending, detailsPending } = useEventSync(event);
   const menu = useDropdown();
   const globalItems = useGlobalItems();
+  // Eerst wie dit seizoen streepjes heeft, op alfabet, dan de rest. Bepaald als
+  // de lijst opent en vast tijdens het turven (zie use-list-order.ts).
+  const people = useListOrder(event, true);
 
   // De lopende rekening die je opent is de volgende keer waar de app mee
   // opent. De voorbeeldlijst van de rondleiding is geen rekening en telt niet.
@@ -202,7 +205,6 @@ export function ListScreen({ id }: { id: string }) {
 
   const counted = withWaiting ?? event;
   const tab = event.kind === 'tab';
-  const people = activePeople(event);
   const nameOf = (personId: string | null) =>
     personId ? (event.people.find((person) => person.id === personId)?.name ?? null) : null;
 

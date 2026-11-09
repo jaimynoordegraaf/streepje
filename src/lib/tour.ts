@@ -87,7 +87,7 @@ export const STEPS: TourStep[] = [
     screen: 'event',
     anchor: ANCHOR.round,
     title: 'Tegelijk turven en een rondje',
-    body: 'Bestelt iemand voor de hele tafel, ieder op zijn eigen rekening? Kies bij Tegelijk turven eerst het drankje en tik daarna alle namen aan. Geeft iemand een rondje? Kies bij Rondje wie geeft, wat en voor wie, en luid de bel. Alles komt op de rekening van de gever.',
+    body: 'Bestelt iemand voor de hele tafel, ieder op zijn eigen rekening? Kies bij Tegelijk turven eerst het drankje en tik daarna de namen aan. Willen anderen iets anders? Kies dan het volgende drankje en tik de volgende namen aan. Geeft iemand een rondje? Kies bij Rondje wie geeft, wat en voor wie, en luid de bel. Alles komt op de rekening van de gever.',
   },
   {
     screen: 'event',

@@ -244,6 +244,85 @@ export function activePeople(event: AppEvent): Person[] {
   return event.people.filter((person) => person.removedAt === null);
 }
 
+/**
+ * Een naam om op te sorteren: zonder hoofdletters en zonder accenten, dus Zoë
+ * staat bij de Z en Émile bij de E.
+ *
+ * Bewust een eigen vergelijking en niet `localeCompare('nl')`. Wat een toestel
+ * onder een taalcode verstaat, hangt af van de ICU-gegevens van dat toestel: Hermes
+ * op Android en iOS kunnen hoofdletters, accenten en leestekens verschillend
+ * rangschikken, en dezelfde lijst moet op de iPad en op een Galaxy dezelfde
+ * volgorde hebben.
+ */
+function nameKey(name: string): string {
+  let text = name.trim().toLowerCase();
+  // Ontbinden en de losse accenten weghalen. Mocht een toestel `normalize` niet
+  // kennen, dan blijft de naam zoals hij is: dat is nog steeds op alfabet.
+  try {
+    if (typeof text.normalize === 'function') {
+      text = text.normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+  } catch {
+    // laten staan
+  }
+  // Letters die niet in een grondletter en een accent uiteenvallen.
+  return text
+    .replace(/ø/g, 'o')
+    .replace(/æ/g, 'ae')
+    .replace(/œ/g, 'oe')
+    .replace(/ß/g, 'ss')
+    .replace(/ł/g, 'l')
+    .replace(/đ/g, 'd');
+}
+
+/** Naam-voor-naam op alfabet, gelijk op elk toestel. Gelijke namen blijven in volgorde. */
+export function compareNames(a: string, b: string): number {
+  const left = nameKey(a);
+  const right = nameKey(b);
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/**
+ * De namen zoals ze in de lijst staan: eerst wie in deze lijst streepjes heeft
+ * (het hele seizoen, alle regels van de lijst), op alfabet, daarna wie nog niets
+ * heeft, ook op alfabet.
+ *
+ * Veel leden komen één keer per jaar en anderen elke week; zo staan de
+ * regelmatigen bij elkaar en vind je de rest ook nog op alfabet.
+ *
+ * Telt wat iemand dronk, niet wat hij betaalt (zie `personItemCount`): een
+ * drankje uit een rondje telt bij wie het kreeg.
+ *
+ * Dit is een momentopname. Het scherm bepaalt de volgorde als de lijst opent en
+ * houdt hem dan vast (zie `use-list-order.ts`), zodat een naam niet onder je
+ * vinger verschuift terwijl je turft.
+ */
+export function peopleForList(event: AppEvent): Person[] {
+  // Eén ronde langs alle regels in plaats van `personItemCount` per persoon.
+  const perPerson = new Map<string, Map<string, number>>();
+  for (const entry of event.entries) {
+    const who = entry.forPersonId ?? entry.personId;
+    const items = perPerson.get(who) ?? new Map<string, number>();
+    items.set(entry.itemId, (items.get(entry.itemId) ?? 0) + entry.delta);
+    perPerson.set(who, items);
+  }
+  const keyed = activePeople(event).map((person, index) => {
+    // Zoals `personItemCount`: per drankje op nul afgekapt, dus een correctie
+    // die de enige streep weghaalt zet iemand weer bij "nog niets".
+    let drinks = 0;
+    for (const quantity of perPerson.get(person.id)?.values() ?? []) drinks += Math.max(0, quantity);
+    return { person, index, drinker: drinks > 0 };
+  });
+  return keyed
+    .sort(
+      (a, b) =>
+        Number(b.drinker) - Number(a.drinker) ||
+        compareNames(a.person.name, b.person.name) ||
+        a.index - b.index
+    )
+    .map((each) => each.person);
+}
+
 /** People taken off the event, newest removal last. */
 export function removedPeople(event: AppEvent): Person[] {
   return event.people
