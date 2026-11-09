@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, SectionList, View } from 'react-native';
 
@@ -6,7 +6,9 @@ import { CheckIcon, CrossIcon } from '@/components/icons';
 import { PinModal } from '@/components/pin-modal';
 import { TourTarget } from '@/components/tour';
 import { Text } from '@/components/text';
+import { useAdminGate } from '@/components/use-admin-gate';
 import {
+  Button,
   Card,
   EmptyState,
   Screen,
@@ -42,6 +44,9 @@ export default function PersonScreen() {
   const hideAmounts = useHideAmounts();
   const setCorrectionPin = useStore((state) => state.setCorrectionPin);
   const bottomInset = useBottomInset();
+  const router = useRouter();
+  // Het logboek zit achter de beheercode, ook via deze knop.
+  const logGate = useAdminGate('Het logboek');
 
   // Which item is waiting on the PIN, and whether we are asking for it or
   // asking the host to choose one for the first time.
@@ -221,6 +226,18 @@ export default function PersonScreen() {
           </View>
         )}
         renderItem={renderItem}
+        ListFooterComponent={
+          <Button
+            title={`Logboek van ${person.name}`}
+            variant="secondary"
+            style={{ marginTop: space.lg }}
+            onPress={() =>
+              logGate.gate(() =>
+                router.push({ pathname: '/event/[id]/log', params: { id, personId: person.id } })
+              )
+            }
+          />
+        }
         ListEmptyComponent={
           <EmptyState
             title="Dit evenement heeft nog geen menu"
@@ -228,6 +245,8 @@ export default function PersonScreen() {
           />
         }
       />
+
+      {logGate.modal}
 
       <PinModal
         visible={asking !== null}

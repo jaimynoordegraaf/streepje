@@ -11,6 +11,7 @@ import * as Sharing from 'expo-sharing';
 import { Share } from 'react-native';
 
 import { csvRow, formatDate, formatDateTime } from './csv';
+import { buildLogXlsx } from './log-xlsx';
 import { centsToPlainNumber, formatCents } from './money';
 import { useStore } from './store';
 import { buildTreasurerCsv, type Period } from './treasurer';
@@ -313,6 +314,32 @@ export async function exportTreasurerCsv(event: AppEvent, period: Period): Promi
     mimeType: 'text/csv',
     dialogTitle: `Penningmeester: ${event.name}`,
     UTI: 'public.comma-separated-values-text',
+  });
+}
+
+/**
+ * Het hele logboek als .xlsx, naar het deelmenu. Altijd alles, ook als het
+ * logboekscherm op één persoon staat: gefilterd wordt in Excel zelf, en een
+ * bestand dat stilletjes maar één naam bevat is een valkuil.
+ */
+export async function exportLogXlsx(event: AppEvent): Promise<void> {
+  const state = useStore.getState();
+  const local = { deviceId: state.deviceId, deviceName: state.deviceName };
+  const filename = `logboek-${slugify(event.name)}-${formatDate(Date.now())}.xlsx`;
+  const file = new File(Paths.cache, filename);
+
+  if (file.exists) file.delete();
+  file.create();
+  file.write(buildLogXlsx(event, local));
+
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error('Delen is niet beschikbaar op dit apparaat.');
+  }
+
+  await Sharing.shareAsync(file.uri, {
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    dialogTitle: `Logboek: ${event.name}`,
+    UTI: 'org.openxmlformats.spreadsheetml.sheet',
   });
 }
 
