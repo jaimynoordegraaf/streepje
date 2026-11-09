@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, SectionList, View } from 'react-native';
+import { Alert, Animated, Easing, SectionList, View } from 'react-native';
 
 import { CheckIcon, CrossIcon } from '@/components/icons';
 import { PinModal } from '@/components/pin-modal';
@@ -90,16 +90,37 @@ export default function PersonScreen() {
   const askingRef = useRef(false);
   askingRef.current = asking !== null;
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  // De dunne balk onder de kop: de resterende tijd, die bij elke tik opnieuw
+  // vol loopt. Een breedte kan niet op de native thread; de balk is klein.
+  const [idleBar] = useState(() => new Animated.Value(1));
+  const restartBar = useCallback(() => {
+    idleBar.stopAnimation();
+    idleBar.setValue(1);
+    Animated.timing(idleBar, {
+      toValue: 0,
+      duration: IDLE_MS,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+  }, [idleBar]);
+  useEffect(() => {
+    restartBar();
+    return () => idleBar.stopAnimation();
+  }, [restartBar, idleBar]);
+
   const touch = useCallback(() => {
     lastTouch.current = Date.now();
     setSecondsLeft(null);
-  }, []);
+    restartBar();
+  }, [restartBar]);
   useEffect(() => {
     const interval = setInterval(() => {
       // De rondleiding leest iemand rustig; die mag het scherm niet onder zich
-      // laten sluiten.
+      // laten sluiten. Met de codevraag open staat de klok stil, en de balk
+      // blijft vol.
       if (askingRef.current || useTour.getState().active) {
         lastTouch.current = Date.now();
+        restartBar();
         return;
       }
       const left = IDLE_MS - (Date.now() - lastTouch.current);
@@ -111,7 +132,7 @@ export default function PersonScreen() {
       }
     }, 500);
     return () => clearInterval(interval);
-  }, [leave]);
+  }, [leave, restartBar]);
 
   const person = event?.people.find((candidate) => candidate.id === personId);
 
@@ -321,6 +342,7 @@ export default function PersonScreen() {
           // Running total, always visible while tapping. A TopBar rather than a
           // child of Screen, so its background reaches both edges of an iPad
           // while the count and amount stay above the list they describe.
+          <>
           <TopBar>
             <View
               style={{
@@ -368,6 +390,17 @@ export default function PersonScreen() {
               </Text>
             </View>
           </TopBar>
+          {/* Hoe lang het scherm nog openstaat zonder tik. */}
+          <View style={{ height: 4, backgroundColor: theme.chip }}>
+            <Animated.View
+              style={{
+                height: 4,
+                backgroundColor: theme.link,
+                width: idleBar.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+              }}
+            />
+          </View>
+          </>
         }>
         <Stack.Screen options={{ title: person.name }} />
 
