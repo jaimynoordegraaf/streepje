@@ -116,6 +116,32 @@ export type Person = {
   billing: Billing;
   /** Who a guest came with: the id of a person in the same list. */
   guestOf: string | null;
+  /**
+   * Welke naam uit de ledenlijst van de groep dit is (zie `RosterMember`).
+   * Leeg voor een gast, en voor wie er al stond voordat de ledenlijst bestond.
+   * Gekoppeld op id en nooit op naam, om dezelfde reden als `memberId`.
+   */
+  rosterId?: string | null;
+};
+
+/**
+ * Een naam in de ledenlijst van de groep. Eén lijst voor de hele groep, op de
+ * server: de barploeg kiest eruit in plaats van te typen. Alleen een beheerder
+ * van de groep schrijft erin.
+ */
+export type RosterMember = {
+  id: string;
+  name: string;
+  /** Verwijst naar `RosterSection.id`. Leeg: bij geen speltak. */
+  sectionId: string | null;
+  /** Weggehaald uit de keuzelijst, niet echt verwijderd: rekeningen blijven kloppen. */
+  removedAt: number | null;
+};
+
+/** Een speltak van de groep: loodsen, stam, bestuur. Hoort bij de ledenlijst. */
+export type RosterSection = {
+  id: string;
+  name: string;
 };
 
 /**

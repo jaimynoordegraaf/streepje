@@ -16,6 +16,7 @@
  */
 
 import { csvRow, formatDate, formatDateTime } from './csv';
+import { guestsOf, isGuestOfMember } from './guests';
 import { LEDGER } from './ledger';
 import { centsToPlainNumber } from './money';
 import { activePeople, paysTonight } from './totals';
@@ -68,7 +69,11 @@ export function buildTreasurerCsv(event: AppEvent, period: Period): string {
   const itemById = new Map(event.menu.map((item) => [item.id, item]));
   // Alleen wie op factuur gaat. Gasten die dezelfde avond afrekenen horen niet
   // op een kwartaalfactuur thuis.
-  const people = activePeople(event).filter((person) => !paysTonight(event, person));
+  const invoiced = activePeople(event).filter((person) => !paysTonight(event, person));
+  // Op een lopende rekening staat een gast onder zijn lid, en zijn streepjes gaan
+  // op de factuur van dat lid: één regel per lid. Een gast zonder lid dat op de
+  // factuur staat houdt zijn eigen regel.
+  const people = invoiced.filter((person) => !isGuestOfMember(event, person, invoiced));
 
   rows.push(csvRow(['Lijst', event.name]));
   rows.push(csvRow(['Van', formatDate(period.from)]));
@@ -95,6 +100,16 @@ export function buildTreasurerCsv(event: AppEvent, period: Period): string {
     return [person.note, host ? `gast van ${host}` : null].filter(Boolean).join(' · ');
   };
 
+  /** Hoeveel een gast in deze periode had, om bij het lid te kunnen zeggen waaruit het bestaat. */
+  const guestCount = (guestId: string): number =>
+    event.entries.reduce(
+      (sum, entry) =>
+        entry.personId === guestId && entry.createdAt >= period.from && entry.createdAt <= period.to
+          ? sum + entry.delta
+          : sum,
+      0
+    );
+
   const totals = new Map<string, number>();
   let totalOverigCents = 0;
   let totalCents = 0;
@@ -103,9 +118,11 @@ export function buildTreasurerCsv(event: AppEvent, period: Period): string {
     const counts = new Map<string, number>();
     let overigCents = 0;
     let personCents = 0;
+    const guests = guestsOf(event, person.id, invoiced);
+    const own = new Set([person.id, ...guests.map((guest) => guest.id)]);
 
     for (const entry of event.entries) {
-      if (entry.personId !== person.id) continue;
+      if (!own.has(entry.personId)) continue;
       if (entry.createdAt < period.from || entry.createdAt > period.to) continue;
 
       const item = itemById.get(entry.itemId);
@@ -131,7 +148,16 @@ export function buildTreasurerCsv(event: AppEvent, period: Period): string {
     rows.push(
       csvRow([
         person.name,
-        addition(person),
+        // Wat van gasten is staat erbij, zodat de penningmeester ziet waaruit de
+        // regel bestaat: "incl. gast Pieter (2)".
+        [
+          addition(person),
+          guests.length > 0
+            ? 'incl. ' + guests.map((guest) => `${guest.name} (${guestCount(guest.id)})`).join(', ')
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
         ...columns.map((column) => counts.get(column.value) ?? 0),
         centsToPlainNumber(overigCents),
         centsToPlainNumber(personCents),

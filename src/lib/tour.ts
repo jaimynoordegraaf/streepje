@@ -81,7 +81,7 @@ export const STEPS: TourStep[] = [
     screen: 'person',
     anchor: ANCHOR.item,
     title: 'Turven is één tik',
-    body: 'Tik op het vinkje en de consumptie staat erop, tegen de prijs van dat moment. Misgetikt? Onderin staat een paar seconden Ongedaan maken, ook als je al bij de volgende bent. Staat de tik eenmaal vast, dan haalt alleen een beheerder hem weg, met de correctiecode.',
+    body: 'Tik op het vinkje voor elke consumptie; het oranje "+2 nu" laat zien wat je deze keer hebt gestreept. Misgetikt? Het kruisje neemt er één terug. Tik op Klaar en het gaat naar het totaal, met onderin nog even Ongedaan maken. Staat het eenmaal vast, dan haalt alleen een beheerder het weg, met de correctiecode.',
   },
   {
     screen: 'event',
@@ -93,7 +93,7 @@ export const STEPS: TourStep[] = [
     screen: 'event',
     anchor: ANCHOR.menu,
     title: 'Een naam erbij, en de rest',
-    body: 'Achter de drie puntjes zet je bovenaan een naam erbij: een lid, een gast of Onbekend. Alles daaronder (totalen, logboek, delen, deze lijst, dit toestel en andere lijsten) is voor de beheerder en vraagt de beheercode.',
+    body: 'Achter de drie puntjes zet je bovenaan een naam erbij: een lid of een gast. Alles daaronder (totalen, logboek, delen, deze lijst, dit toestel en andere lijsten) is voor de beheerder en vraagt de beheercode.',
   },
 ];
 
