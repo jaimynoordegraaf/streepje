@@ -45,11 +45,28 @@ function freeze(event: AppEvent): Frozen {
  *                 het toestel terugkomt. Dat is het werk van de lijst zelf. Waar
  *                 `false` leest het scherm mee wat de lijst vastlegde.
  */
+/**
+ * De namen in de vastgehouden volgorde. Een gewone functie met `version` als
+ * argument, en geen losse regels in de hook: de React Compiler onthoudt het
+ * resultaat per `event` en zou anders een nieuwe volgorde na het terugkomen uit
+ * de achtergrond niet doorgeven, omdat `event` dan niet verandert.
+ */
+function orderedPeople(event: AppEvent, version: number): Person[] {
+  void version;
+  let current = frozen.get(event.id);
+  if (!current || current.people !== peopleKey(event)) current = freeze(event);
+
+  const position = new Map(current.ids.map((id, index) => [id, index]));
+  return activePeople(event)
+    .slice()
+    .sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
+}
+
 export function useListOrder(event: AppEvent | undefined, refresh: boolean): Person[] {
   const eventId = event?.id;
   // Eén keer bij het openen: de oude volgorde weggooien. Gebeurt in de
   // initiële waarde zodat het vóór de eerste weergave klaar is.
-  const [, setTick] = useState(() => {
+  const [version, setVersion] = useState(() => {
     if (refresh && eventId) frozen.delete(eventId);
     return 0;
   });
@@ -59,18 +76,12 @@ export function useListOrder(event: AppEvent | undefined, refresh: boolean): Per
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
       frozen.delete(eventId);
-      setTick((tick) => tick + 1);
+      setVersion((current) => current + 1);
     });
     return () => subscription.remove();
   }, [refresh, eventId]);
 
-  if (!event) return [];
-
-  let current = frozen.get(event.id);
-  if (!current || current.people !== peopleKey(event)) current = freeze(event);
-
-  const position = new Map(current.ids.map((id, index) => [id, index]));
-  return activePeople(event)
-    .slice()
-    .sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
+  return event ? orderedPeople(event, version) : NOBODY;
 }
+
+const NOBODY: Person[] = [];
