@@ -25,6 +25,8 @@ import type {
   MenuItem,
   OrderEntry,
   Person,
+  RosterMember,
+  RosterSection,
   SessionMember,
 } from './types';
 import { ensureSignedIn, supabase } from './supabase';
@@ -45,6 +47,8 @@ type PersonRow = {
   /** Rows from before billing existed have the database default, 'tonight'. */
   billing: 'invoice' | 'tonight';
   guest_of: string | null;
+  /** Pas na supabase/019-group-roster.sql, en alleen gevuld bij een naam uit de ledenlijst. */
+  roster_id?: string | null;
 };
 type ItemRow = {
   id: string;
@@ -85,6 +89,7 @@ const toPerson = (row: PersonRow): Person => ({
   memberId: row.member_id ?? null,
   billing: row.billing === 'invoice' ? 'invoice' : 'tonight',
   guestOf: row.guest_of ?? null,
+  rosterId: row.roster_id ?? null,
 });
 
 const fromPerson = (sessionId: string, person: Person, settled: boolean): PersonRow => ({
@@ -100,6 +105,9 @@ const fromPerson = (sessionId: string, person: Person, settled: boolean): Person
   member_id: person.memberId,
   billing: person.billing,
   guest_of: person.guestOf,
+  // Alleen meesturen als er iets te melden is. Zo blijft een lijst synchroniseren
+  // op een database waar 019 nog niet gedraaid is, zolang niemand de ledenlijst gebruikt.
+  ...(person.rosterId ? { roster_id: person.rosterId } : {}),
 });
 
 const toItem = (row: ItemRow): MenuItem => ({
@@ -722,5 +730,113 @@ export function subscribeToSession(sessionId: string, handlers: Handlers): () =>
       client().removeChannel(current.channel);
       openChannels.delete(sessionId);
     }
+  };
+}
+
+// ------------------------------------------------- ledenlijst van de groep ----
+//
+// Eén lijst namen voor de hele groep (supabase/019-group-roster.sql). Elke
+// telefoon in de groep leest hem; alleen een beheerder van de groep schrijft. De
+// database dwingt dat af: de functies hieronder zeggen dus gewoon wat er
+// terugkomt en vertrouwen niet op wat de knop van de app liet zien.
+
+export type Roster = {
+  members: RosterMember[];
+  sections: RosterSection[];
+  /** Of deze telefoon beheerder van de groep is. */
+  admin: boolean;
+};
+
+export async function fetchRoster(groupId: string): Promise<Roster> {
+  const db = client();
+  const me = await ensureSignedIn();
+  const [members, sections, admins] = await Promise.all([
+    db.from('group_roster').select('id, name, section_id, removed_at').eq('group_id', groupId),
+    db.from('group_sections').select('id, name').eq('group_id', groupId),
+    db.from('group_admins').select('user_id').eq('group_id', groupId),
+  ]);
+  const failure = members.error ?? sections.error ?? admins.error;
+  if (failure) throw failure;
+  return {
+    members: (members.data ?? []).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      sectionId: (row.section_id as string | null) ?? null,
+      removedAt: row.removed_at ? Date.parse(row.removed_at as string) : null,
+    })),
+    sections: (sections.data ?? []).map((row) => ({ id: row.id as string, name: row.name as string })),
+    admin: (admins.data ?? []).some((row) => row.user_id === me),
+  };
+}
+
+/** Namen erbij. Een naam die er al staat (ook weggehaald) weigert de database. */
+export async function addRosterMembers(
+  groupId: string,
+  members: { id: string; name: string; sectionId: string | null }[]
+): Promise<void> {
+  if (members.length === 0) return;
+  const { error } = await client()
+    .from('group_roster')
+    .insert(
+      members.map((member) => ({
+        id: member.id,
+        group_id: groupId,
+        name: member.name,
+        section_id: member.sectionId,
+      }))
+    );
+  if (error) throw error;
+}
+
+/** Eén wijziging aan een naam of speltak. Raakt het niets, dan was dit geen beheerder. */
+async function changeRoster(
+  table: 'group_roster' | 'group_sections',
+  id: string,
+  patch: Record<string, unknown>
+): Promise<void> {
+  const { data, error } = await client().from(table).update(patch).eq('id', id).select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Alleen een beheerder van de groep kan de ledenlijst wijzigen.');
+  }
+}
+
+export const renameRosterMember = (id: string, name: string) => changeRoster('group_roster', id, { name });
+export const setRosterMemberSection = (id: string, sectionId: string | null) =>
+  changeRoster('group_roster', id, { section_id: sectionId });
+export const setRosterMemberRemoved = (id: string, removed: boolean) =>
+  changeRoster('group_roster', id, { removed_at: removed ? new Date().toISOString() : null });
+
+export async function addRosterSection(groupId: string, id: string, name: string): Promise<void> {
+  const { error } = await client().from('group_sections').insert({ id, group_id: groupId, name });
+  if (error) throw error;
+}
+
+export const renameRosterSection = (id: string, name: string) => changeRoster('group_sections', id, { name });
+
+export async function removeRosterSection(id: string): Promise<void> {
+  const { data, error } = await client().from('group_sections').delete().eq('id', id).select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Alleen een beheerder van de groep kan de ledenlijst wijzigen.');
+  }
+}
+
+/**
+ * Meekijken naar wijzigingen in de ledenlijst, zodat een naam die een beheerder
+ * toevoegt meteen op de andere telefoons staat. Geeft de functie terug om te
+ * stoppen.
+ */
+export function subscribeToRoster(groupId: string, onChange: () => void): () => void {
+  const db = client();
+  const filter = `group_id=eq.${groupId}`;
+  const channel = db
+    .channel(`turf-roster:${groupId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'group_roster', filter }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'group_sections', filter }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'group_admins', filter }, onChange)
+    .subscribe();
+  return () => {
+    client().removeChannel(channel);
   };
 }

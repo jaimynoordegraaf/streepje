@@ -128,7 +128,8 @@ export default function NewListsScreen() {
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
             De mensen die er meestal zijn, zodat je ze niet elke keer opnieuw hoeft in te typen.
             In het menu van een lijst, onder Beheer, kies je wie er die avond bij komt: een hele speltak, of
-            naam voor naam.
+            naam voor naam. Zit deze telefoon in een groep, dan staat er onder Dit toestel ook een
+            Ledenlijst voor de hele groep; die neemt deze namen over en vervangt ze.
           </Text>
 
           {defaultPeople.length === 0 ? (
