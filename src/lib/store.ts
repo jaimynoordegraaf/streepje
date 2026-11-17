@@ -12,6 +12,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { guessLedger } from './ledger';
+import { nameKey } from './names';
 import type {
   AppEvent,
   Billing,
@@ -703,13 +704,17 @@ export const useStore = create<StoreState>()(
         });
       },
 
-      addDefaultPerson: (name, sectionId = null) =>
+      addDefaultPerson: (name, sectionId = null) => {
+        // Een naam die er al staat (ook met andere hoofdletters of spaties) komt er
+        // niet nog een keer bij.
+        if (get().defaultPeople.some((saved) => nameKey(saved.name) === nameKey(name))) return;
         set({
           defaultPeople: [
             ...get().defaultPeople,
             { id: newId(), name: name.trim() || 'Iemand', sectionId },
           ],
-        }),
+        });
+      },
 
       renameDefaultPerson: (personId, name) =>
         set({

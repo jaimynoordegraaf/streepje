@@ -7,6 +7,7 @@ import { Text } from '@/components/text';
 import { MenuEditor } from '@/components/menu-editor';
 import { PromptModal, SavedPeoplePickerModal, whenAlertClosed } from '@/components/modals';
 import { PinModal } from '@/components/pin-modal';
+import { askAboutSameName } from '@/components/same-name';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import {
   correctionBlock,
@@ -14,6 +15,7 @@ import {
   isAdminDevice,
   unlockCorrections,
 } from '@/lib/pin';
+import { findSameName } from '@/lib/names';
 import { useEvent, useStore } from '@/lib/store';
 import { formatDateTime } from '@/lib/export';
 import { activePeople, removedPeople } from '@/lib/totals';
@@ -30,7 +32,6 @@ export default function SetupScreen() {
   const deleteEvent = useStore((state) => state.deleteEvent);
   const setEventClosed = useStore((state) => state.setEventClosed);
   const setCorrectionPin = useStore((state) => state.setCorrectionPin);
-  const addPerson = useStore((state) => state.addPerson);
   const addPeople = useStore((state) => state.addPeople);
   const defaultPeople = useStore((state) => state.defaultPeople);
   const sections = useStore((state) => state.sections);
@@ -45,7 +46,6 @@ export default function SetupScreen() {
   const removeItem = useStore((state) => state.removeItem);
 
   const [renamingEvent, setRenamingEvent] = useState(false);
-  const [addingPerson, setAddingPerson] = useState(false);
   const [pickingSaved, setPickingSaved] = useState(false);
   const [renamingPerson, setRenamingPerson] = useState<Person | null>(null);
   const [notingPerson, setNotingPerson] = useState<Person | null>(null);
@@ -368,7 +368,12 @@ export default function SetupScreen() {
               Dit evenement is afgesloten. Heropen het om iemand toe te voegen of te verwijderen.
             </Text>
           ) : (
-            <Button title="Persoon toevoegen" variant="secondary" onPress={() => setAddingPerson(true)} />
+            // Een naam erbij zetten doe je in het menu van de lijst: daar kijkt de
+            // app of de naam er al staat. Hier stond een tweede knop die hetzelfde
+            // deed, zonder die controle.
+            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+              Iemand erbij? Via het menu ⋯ van de lijst, onder Voor de bar.
+            </Text>
           )}
 
           {defaultPeople.length > 0 && !event.closed ? (
@@ -428,18 +433,6 @@ export default function SetupScreen() {
         onSubmit={(names) => {
           addPeople(id, names);
           setPickingSaved(false);
-        }}
-      />
-
-      <PromptModal
-        visible={addingPerson}
-        title="Persoon toevoegen"
-        placeholder="Naam"
-        submitLabel="Toevoegen"
-        onCancel={() => setAddingPerson(false)}
-        onSubmit={(name) => {
-          addPerson(id, name);
-          setAddingPerson(false);
         }}
       />
 
@@ -558,8 +551,18 @@ export default function SetupScreen() {
         initialValue={renamingPerson?.name ?? ''}
         onCancel={() => setRenamingPerson(null)}
         onSubmit={(name) => {
-          if (renamingPerson) renamePerson(id, renamingPerson.id, name);
+          const person = renamingPerson;
           setRenamingPerson(null);
+          if (!person) return;
+          // Hernoemen naar een naam die er al staat geeft twee regels voor één
+          // mens; eerst vragen. De eigen naam met andere hoofdletters mag.
+          const match = findSameName(event, name, person.id);
+          if (!match) return renamePerson(id, person.id, name);
+          askAboutSameName({
+            match,
+            proceedLabel: 'Toch hernoemen',
+            onProceed: () => renamePerson(id, person.id, name),
+          });
         }}
       />
     </Screen>

@@ -24,11 +24,15 @@ import {
   type DropdownItem,
 } from '@/components/menu';
 import { BellIcon } from '@/components/bell';
-import { GuestModal, MemberPickerModal, PromptModal } from '@/components/modals';
+import { GuestModal, MemberPickerModal } from '@/components/modals';
+import { NameSuggestModal, type NameCandidate } from '@/components/name-suggest';
+import { askAboutSameName } from '@/components/same-name';
 import { Tally } from '@/components/tally';
 import { TourTarget } from '@/components/tour';
 import { BottomBar, Button, Card, EmptyState, Screen } from '@/components/ui';
+import { guestsOf, guestsUnderHosts } from '@/lib/guests';
 import { formatCents } from '@/lib/money';
+import { findSameName, nameKey } from '@/lib/names';
 import { useWithPending } from '@/lib/pending';
 import { useEvent, useStore } from '@/lib/store';
 import { ANCHOR } from '@/lib/tour';
@@ -44,7 +48,7 @@ import {
   personItemCount,
   personTotalCents,
 } from '@/lib/totals';
-import type { ListKind } from '@/lib/types';
+import type { ListKind, Person } from '@/lib/types';
 import { radius, space, useTheme } from '@/theme';
 
 function SummaryCard({
@@ -168,7 +172,9 @@ export function ListScreen({ id }: { id: string }) {
   const events = useStore((state) => state.events);
   const addPerson = useStore((state) => state.addPerson);
   const addMembers = useStore((state) => state.addMembers);
-  const addUnknownPerson = useStore((state) => state.addUnknownPerson);
+  const addDefaultPerson = useStore((state) => state.addDefaultPerson);
+  const defaultPeople = useStore((state) => state.defaultPeople);
+  const localSections = useStore((state) => state.sections);
   const setHomeTab = useStore((state) => state.setHomeTab);
   const display = useStore((state) => state.display);
   const [adding, setAdding] = useState<'name' | 'guest' | 'members' | null>(null);
@@ -202,21 +208,60 @@ export function ListScreen({ id }: { id: string }) {
 
   const counted = withWaiting ?? event;
   const tab = event.kind === 'tab';
-  const people = activePeople(event);
+  // Op een rekening staat een gast direct onder zijn lid.
+  const people = guestsUnderHosts(event, activePeople(event));
+  const isGuestRow = (person: Person) =>
+    tab && person.guestOf !== null && people.some((other) => other.id === person.guestOf);
   const nameOf = (personId: string | null) =>
     personId ? (event.people.find((person) => person.id === personId)?.name ?? null) : null;
 
-  // For a sale to someone not on the list: record it now, and work out who it
-  // was later by renaming them.
-  const addUnknown = () => {
-    const personId = addUnknownPerson(id);
-    router.push({
-      pathname: '/event/[id]/person/[personId]',
-      params: { id, personId },
+  const sharing = shareState(Boolean(event.share), status, pending, detailsPending);
+
+  // De namen waaruit Lid toevoegen voorstellen doet: de Vaste namen van dit toestel.
+  // Wie al op deze lijst staat (of eerder is verwijderd) staat er ook tussen, maar
+  // is grijs: zo zie je waarom je niet nog een Jan krijgt.
+  const sectionLabel = (sectionId: string | null | undefined) =>
+    localSections.find((section) => section.id === sectionId)?.name ?? null;
+  const blockedLabel = (name: string): string | null => {
+    const same = event.people.find((person) => nameKey(person.name) === nameKey(name));
+    if (!same) return null;
+    return same.removedAt === null ? 'staat al op de lijst' : 'eerder verwijderd';
+  };
+  const nameCandidates: NameCandidate[] = (() => {
+    const source: NameCandidate[] = defaultPeople.map((saved) => ({
+      id: saved.id,
+      name: saved.name,
+      section: sectionLabel(saved.sectionId),
+      blocked: blockedLabel(saved.name),
+    }));
+    const known = new Set(source.map((candidate) => nameKey(candidate.name)));
+    // Wie op de lijst staat maar in de bron ontbreekt, ook als voorstel (grijs).
+    const onList: NameCandidate[] = event.people
+      .filter((person) => !known.has(nameKey(person.name)))
+      .map((person) => ({
+        id: person.id,
+        name: person.name,
+        section: null,
+        blocked: person.removedAt === null ? 'staat al op de lijst' : 'eerder verwijderd',
+      }));
+    return [...source, ...onList];
+  })();
+
+  // Staat de naam er al, dan eerst vragen. De vraag komt als het venster dicht is.
+  const addUnlessSame = (name: string, add: () => void) => {
+    const match = findSameName(event, name);
+    if (!match) return add();
+    askAboutSameName({
+      match,
+      proceedLabel: 'Toch toevoegen',
+      onProceed: add,
+      onGoTo: (person) =>
+        router.push({
+          pathname: '/event/[id]/person/[personId]',
+          params: { id, personId: person.id },
+        }),
     });
   };
-
-  const sharing = shareState(Boolean(event.share), status, pending, detailsPending);
 
   // Wat niet turven is, in twee blokken. Eerst wat de barploeg af en toe nodig
   // heeft: namen erbij zetten. Dat stond onder de lijst, maar wordt bijna niet
@@ -227,12 +272,11 @@ export function ListScreen({ id }: { id: string }) {
     : tab
     ? [
         { label: 'Lid toevoegen', onPress: () => setAdding('name') },
-        { label: 'Onbekend', onPress: addUnknown },
+        { label: 'Gast', onPress: () => setAdding('guest') },
       ]
     : [
         { label: 'Leden', onPress: () => setAdding('members') },
         { label: 'Gast', onPress: () => setAdding('guest') },
-        { label: 'Onbekend', onPress: addUnknown },
       ];
 
   const items: DropdownItem[] = [
@@ -337,12 +381,31 @@ export function ListScreen({ id }: { id: string }) {
           />
         }
         renderItem={({ item: person, index }) => {
-          const total = personTotalCents(counted, person.id);
-          const count = personItemCount(counted, person.id);
+          // Een lid telt zijn gasten mee: hun streepjes zijn op zijn factuur.
+          // De gast zelf staat er als eigen regel onder, om te zien wie wat dronk.
+          const guests = guestsOf(event, person.id, people);
+          const guestCount = guests.reduce(
+            (sum, guest) => sum + personItemCount(counted, guest.id),
+            0
+          );
+          const total =
+            personTotalCents(counted, person.id) +
+            guests.reduce((sum, guest) => sum + personTotalCents(counted, guest.id), 0);
+          const count = personItemCount(counted, person.id) + guestCount;
           // Er zit een streep bij die nog niet vast staat.
-          const waiting = count !== personItemCount(event, person.id);
+          const settledCount =
+            personItemCount(event, person.id) +
+            guests.reduce((sum, guest) => sum + personItemCount(event, guest.id), 0);
+          const waiting = count !== settledCount;
           const host = nameOf(person.guestOf);
-          const note = [person.note, host ? 'gast van ' + host : null].filter(Boolean).join(' · ');
+          const guestRow = isGuestRow(person);
+          const note = [
+            person.note,
+            host ? 'gast van ' + host : null,
+            guestCount > 0 ? 'waarvan ' + guestCount + ' van gasten' : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
           // On a tab everyone is invoiced, so saying so on every row is noise.
           const invoiced = !tab && !paysTonight(event, person);
           const row = (
@@ -353,8 +416,13 @@ export function ListScreen({ id }: { id: string }) {
                   params: { id, personId: person.id },
                 })
               }
-              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-              <Card>
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.7 : 1,
+                // Een gast staat ingesprongen onder zijn lid.
+                marginLeft: guestRow ? space.xl : 0,
+              })}>
+              <Card
+                style={guestRow ? { borderLeftWidth: 4, borderLeftColor: theme.link } : undefined}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>
@@ -439,29 +507,45 @@ export function ListScreen({ id }: { id: string }) {
         }}
       />
 
-      <PromptModal
+      <NameSuggestModal
         visible={adding === 'name'}
-        title="Lid toevoegen"
-        placeholder="Naam"
-        submitLabel="Toevoegen"
+        candidates={nameCandidates}
         onCancel={() => setAdding(null)}
-        onSubmit={(name) => {
-          addPerson(id, name);
+        onPick={(candidate) => {
           setAdding(null);
+          addPerson(id, candidate.name);
+        }}
+        onNew={(name) => {
+          setAdding(null);
+          addPerson(id, name);
+          // Een nieuwe naam wordt ook een Vaste naam, zodat hij de volgende keer een
+          // voorstel is.
+          addDefaultPerson(name);
         }}
       />
 
       <GuestModal
         visible={adding === 'guest'}
-        hosts={people.filter((person) => person.memberId !== null)}
+        // Op een rekening kan een gast bij elk lid horen; op een evenement alleen
+        // bij een lid dat uit de rekening is meegekomen.
+        hosts={
+          tab
+            ? people.filter((person) => person.guestOf === null)
+            : people.filter((person) => person.memberId !== null)
+        }
+        onTab={tab}
         onCancel={() => setAdding(null)}
         onSubmit={(guest) => {
-          addPerson(id, guest.name, {
-            billing: guest.billing,
-            guestOf: guest.guestOf,
-            note: guest.note,
-          });
           setAdding(null);
+          const add = () =>
+            addPerson(id, guest.name, {
+              billing: guest.billing,
+              guestOf: guest.guestOf,
+              note: guest.note,
+            });
+          // Een naam die de app zelf bedacht ("Gast van Anne") mag dubbel.
+          if (guest.named) addUnlessSame(guest.name, add);
+          else add();
         }}
       />
 
