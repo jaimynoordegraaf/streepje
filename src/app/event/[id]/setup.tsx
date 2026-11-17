@@ -34,6 +34,8 @@ export default function SetupScreen() {
   const setCorrectionPin = useStore((state) => state.setCorrectionPin);
   const addPeople = useStore((state) => state.addPeople);
   const defaultPeople = useStore((state) => state.defaultPeople);
+  const group = useStore((state) => state.group);
+  const roster = useStore((state) => state.roster);
   const sections = useStore((state) => state.sections);
   const renamePerson = useStore((state) => state.renamePerson);
   const removePerson = useStore((state) => state.removePerson);
@@ -376,7 +378,11 @@ export default function SetupScreen() {
             </Text>
           )}
 
-          {defaultPeople.length > 0 && !event.closed ? (
+          {/* Zodra de groep een ledenlijst heeft, kies je daaruit via het menu van de
+              lijst (Lid toevoegen). De Vaste namen van dit toestel zijn dan overgenomen. */}
+          {defaultPeople.length > 0 &&
+          !event.closed &&
+          !(roster && roster.groupId === group?.id && roster.members.some((m) => m.removedAt === null)) ? (
             <Button
               title={`Vaste namen toevoegen (${
                 defaultPeople.filter(

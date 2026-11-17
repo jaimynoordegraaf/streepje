@@ -22,6 +22,8 @@ import type {
   OrderEntry,
   Person,
   PinRecord,
+  RosterMember,
+  RosterSection,
   SavedPerson,
   Section,
   ShareInfo,
@@ -132,6 +134,16 @@ function pruneEntries(entries: OrderEntry[], personIds: string[], itemIds: strin
   return entries.filter((entry) => people.has(entry.personId) && items.has(entry.itemId));
 }
 
+/** De ledenlijst zoals hij bewaard wordt, met de groep waar hij bij hoort. */
+export type StoredRoster = {
+  groupId: string;
+  members: RosterMember[];
+  sections: RosterSection[];
+  /** Of deze telefoon bij het laatste ophalen beheerder van de groep was. */
+  admin: boolean;
+  fetchedAt: number;
+};
+
 type StoreState = {
   /** Identifies this phone in the order log. Generated once, then kept. */
   deviceId: string;
@@ -188,6 +200,20 @@ type StoreState = {
    * waarom het geen "groep" heet.
    */
   sections: Section[];
+  /**
+   * De ledenlijst van de groep, zoals de server hem het laatst gaf. Bewaard zodat
+   * kiezen ook werkt zonder verbinding. Leeg zolang de telefoon in geen groep zit
+   * of hem nog nooit kon ophalen; dan typen de schermen nog zoals voorheen.
+   */
+  roster: StoredRoster | null;
+  setRoster: (roster: StoredRoster | null) => void;
+  /**
+   * Namen uit de ledenlijst op een lijst zetten, elk gekoppeld aan zijn id. Wie er
+   * al op staat (op id, of met dezelfde naam) wordt overgeslagen.
+   */
+  addRosterPeople: (eventId: string, members: RosterMember[]) => void;
+  /** Bestaande namen op een lijst aan de ledenlijst koppelen. Zie het overnemen. */
+  linkRosterIds: (eventId: string, links: { personId: string; rosterId: string }[]) => void;
 
   createEvent: (name: string, kind?: ListKind) => string;
   /**
@@ -343,6 +369,40 @@ export const useStore = create<StoreState>()(
       defaultMenu: withIds(STARTER_MENU),
       defaultPeople: [],
       sections: [],
+      roster: null,
+
+      setRoster: (roster) => set({ roster }),
+
+      addRosterPeople: (eventId, members) =>
+        set({
+          events: mapEvent(get().events, eventId, (event) => {
+            if (event.closed) return event;
+            const linked = new Set(
+              event.people.map((person) => person.rosterId).filter((id): id is string => Boolean(id))
+            );
+            const named = new Set(event.people.map((person) => nameKey(person.name)));
+            const fresh = members
+              .filter((member) => !linked.has(member.id) && !named.has(nameKey(member.name)))
+              .map((member) => ({
+                ...newPerson(event, member.name, { billing: 'invoice' }),
+                rosterId: member.id,
+              }));
+            return fresh.length === 0 ? event : { ...event, people: [...event.people, ...fresh] };
+          }),
+        }),
+
+      linkRosterIds: (eventId, links) =>
+        set({
+          events: mapEvent(get().events, eventId, (event) => {
+            const byPerson = new Map(links.map((link) => [link.personId, link.rosterId]));
+            return {
+              ...event,
+              people: event.people.map((person) =>
+                byPerson.has(person.id) ? { ...person, rosterId: byPerson.get(person.id) } : person
+              ),
+            };
+          }),
+        }),
 
       createEvent: (name, kind = 'event') => {
         const id = newId();

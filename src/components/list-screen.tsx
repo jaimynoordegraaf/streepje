@@ -36,6 +36,7 @@ import { findSameName, nameKey } from '@/lib/names';
 import { useWithPending } from '@/lib/pending';
 import { useEvent, useStore } from '@/lib/store';
 import { ANCHOR } from '@/lib/tour';
+import { useRoster } from '@/lib/use-roster';
 import { useEventSync, type SyncStatus } from '@/lib/use-sync';
 import {
   activePeople,
@@ -172,9 +173,11 @@ export function ListScreen({ id }: { id: string }) {
   const events = useStore((state) => state.events);
   const addPerson = useStore((state) => state.addPerson);
   const addMembers = useStore((state) => state.addMembers);
+  const addRosterPeople = useStore((state) => state.addRosterPeople);
   const addDefaultPerson = useStore((state) => state.addDefaultPerson);
   const defaultPeople = useStore((state) => state.defaultPeople);
   const localSections = useStore((state) => state.sections);
+  const { roster } = useRoster();
   const setHomeTab = useStore((state) => state.setHomeTab);
   const display = useStore((state) => state.display);
   const [adding, setAdding] = useState<'name' | 'guest' | 'members' | null>(null);
@@ -217,23 +220,35 @@ export function ListScreen({ id }: { id: string }) {
 
   const sharing = shareState(Boolean(event.share), status, pending, detailsPending);
 
-  // De namen waaruit Lid toevoegen voorstellen doet: de Vaste namen van dit toestel.
-  // Wie al op deze lijst staat (of eerder is verwijderd) staat er ook tussen, maar
-  // is grijs: zo zie je waarom je niet nog een Jan krijgt.
+  // De namen waaruit Lid toevoegen voorstellen doet. Zit de telefoon in een groep
+  // met een ledenlijst, dan komen ze daaruit; anders uit de Vaste namen van dit
+  // toestel. Wie al op deze lijst staat (of eerder is verwijderd) staat er ook
+  // tussen, maar is grijs: zo zie je waarom je niet nog een Jan krijgt.
+  const rosterMembers = roster ? roster.members.filter((member) => member.removedAt === null) : [];
+  const fromRoster = rosterMembers.length > 0;
   const sectionLabel = (sectionId: string | null | undefined) =>
-    localSections.find((section) => section.id === sectionId)?.name ?? null;
-  const blockedLabel = (name: string): string | null => {
-    const same = event.people.find((person) => nameKey(person.name) === nameKey(name));
+    (fromRoster ? roster?.sections : localSections)?.find((section) => section.id === sectionId)?.name ?? null;
+  const blockedLabel = (id: string, name: string): string | null => {
+    const same = event.people.find(
+      (person) => person.rosterId === id || nameKey(person.name) === nameKey(name)
+    );
     if (!same) return null;
     return same.removedAt === null ? 'staat al op de lijst' : 'eerder verwijderd';
   };
   const nameCandidates: NameCandidate[] = (() => {
-    const source: NameCandidate[] = defaultPeople.map((saved) => ({
-      id: saved.id,
-      name: saved.name,
-      section: sectionLabel(saved.sectionId),
-      blocked: blockedLabel(saved.name),
-    }));
+    const source: NameCandidate[] = fromRoster
+      ? rosterMembers.map((member) => ({
+          id: member.id,
+          name: member.name,
+          section: sectionLabel(member.sectionId),
+          blocked: blockedLabel(member.id, member.name),
+        }))
+      : defaultPeople.map((saved) => ({
+          id: saved.id,
+          name: saved.name,
+          section: sectionLabel(saved.sectionId),
+          blocked: blockedLabel(saved.id, saved.name),
+        }));
     const known = new Set(source.map((candidate) => nameKey(candidate.name)));
     // Wie op de lijst staat maar in de bron ontbreekt, ook als voorstel (grijs).
     const onList: NameCandidate[] = event.people
@@ -513,14 +528,20 @@ export function ListScreen({ id }: { id: string }) {
         onCancel={() => setAdding(null)}
         onPick={(candidate) => {
           setAdding(null);
-          addPerson(id, candidate.name);
+          if (fromRoster) {
+            addRosterPeople(id, [
+              { id: candidate.id, name: candidate.name, sectionId: null, removedAt: null },
+            ]);
+          } else {
+            addPerson(id, candidate.name);
+          }
         }}
         onNew={(name) => {
           setAdding(null);
           addPerson(id, name);
           // Een nieuwe naam wordt ook een Vaste naam, zodat hij de volgende keer een
-          // voorstel is.
-          addDefaultPerson(name);
+          // voorstel is. In een groep met ledenlijst voegt een beheerder hem daar toe.
+          if (!fromRoster) addDefaultPerson(name);
         }}
       />
 
