@@ -12,6 +12,10 @@
  * zoals ze zijn en de rijen wijzen ernaar. Alleen de twee exports staan er zelf,
  * omdat de penningmeester ze het vaakst nodig heeft en ze één knop zijn.
  *
+ * Elke rij opent één ding op een eigen scherm. Wat eerst een stuk van een lang
+ * scherm was (Deze lijst, Dit toestel) is daarvoor in stukken gesneden:
+ * personen.tsx, menu-prijzen.tsx en groep.tsx zijn daar uit voortgekomen.
+ *
  * De rijen zijn gegevens (zie `Row`), geen vaste tekening: een rij kan later
  * verdwijnen of ergens anders heen wijzen zonder dat de rest verandert.
  *
@@ -36,6 +40,8 @@ import {
 } from '@/lib/export';
 import { isAdminDevice, unlockSecondsLeft } from '@/lib/pin';
 import { useEvent, useHomeList, useStore } from '@/lib/store';
+import { isSyncConfigured } from '@/lib/supabase';
+import { useStartTour } from '@/lib/tour';
 import { radius, space, useTheme } from '@/theme';
 
 type Row = {
@@ -128,6 +134,8 @@ export function BeheerPage({ id }: { id?: string }) {
   const event = useEvent(id);
   const home = useHomeList();
   const eventCount = useStore((state) => state.events.filter((candidate) => !candidate.demo).length);
+  const group = useStore((state) => state.group);
+  const startTour = useStartTour();
   const bottomInset = useBottomInset();
   const [busy, setBusy] = useState(false);
   const [choosingPeriod, setChoosingPeriod] = useState(false);
@@ -172,10 +180,18 @@ export function BeheerPage({ id }: { id?: string }) {
   if (event && id) {
     const tab = event.kind === 'tab';
     const sharing = sharingLine(Boolean(event.share), event.unsyncedEntryIds.length);
-    const go = (pathname: '/event/[id]/totals' | '/event/[id]/log' | '/event/[id]/share') => () =>
-      router.push({ pathname, params: { id } });
-    const goSetup = (deel?: 'menu' | 'personen') => () =>
-      router.push({ pathname: '/event/[id]/setup', params: deel ? { id, deel } : { id } });
+    const go =
+      (
+        pathname:
+          | '/event/[id]/totals'
+          | '/event/[id]/log'
+          | '/event/[id]/share'
+          | '/event/[id]/personen'
+          | '/event/[id]/menu-prijzen'
+          | '/event/[id]/setup'
+      ) =>
+      () =>
+        router.push({ pathname, params: { id } });
 
     groups.push({
       title: 'Afrekenen',
@@ -223,7 +239,7 @@ export function BeheerPage({ id }: { id?: string }) {
           key: 'people',
           label: tab ? 'Leden' : 'Personen',
           hint: 'Hernoemen, verwijderen, terugzetten',
-          onPress: goSetup('personen'),
+          onPress: go('/event/[id]/personen'),
         },
       ],
       note: 'Een streep weghalen doe je bij de persoon zelf, met de code. Dat blijft daar.',
@@ -236,7 +252,7 @@ export function BeheerPage({ id }: { id?: string }) {
           key: 'menu',
           label: 'Menu en prijzen',
           hint: 'Voor deze lijst',
-          onPress: goSetup('menu'),
+          onPress: go('/event/[id]/menu-prijzen'),
         },
         {
           key: 'share',
@@ -247,10 +263,10 @@ export function BeheerPage({ id }: { id?: string }) {
         },
         {
           key: 'setup',
-          label: 'Naam en correctiecode',
+          label: 'Naam, code en afsluiten',
           hint: event.correctionPin || !isAdminDevice(event) ? undefined : 'Nog geen code ingesteld',
           alert: !event.correctionPin && isAdminDevice(event),
-          onPress: goSetup(),
+          onPress: go('/event/[id]/setup'),
         },
       ],
     });
@@ -259,11 +275,48 @@ export function BeheerPage({ id }: { id?: string }) {
   const device: Row[] = [
     {
       key: 'settings',
-      label: 'Dit toestel',
-      hint: 'Naam, weergave, groep, ledenlijst, ideeën, rondleiding',
+      label: 'Naam en weergave',
+      hint: 'Naam van de iPad, bedragen of streepjes',
       onPress: () => router.push('/settings'),
     },
   ];
+  // Zonder server bestaan groep, ledenlijst en ideeën niet.
+  if (isSyncConfigured) {
+    device.push(
+      {
+        key: 'group',
+        label: 'Groep',
+        hint: group ? group.name : 'Aanmaken of deelnemen',
+        onPress: () => router.push('/groep'),
+      },
+      {
+        key: 'roster',
+        label: 'Ledenlijst',
+        hint: 'De namen van de groep',
+        onPress: () => router.push('/ledenlijst'),
+      }
+    );
+  }
+  device.push({
+    key: 'new-lists',
+    label: 'Menu en vaste namen',
+    hint: 'Voor nieuwe lijsten',
+    onPress: () => router.push('/nieuwe-lijsten'),
+  });
+  if (isSyncConfigured) {
+    device.push({
+      key: 'ideas',
+      label: 'Ideeën',
+      hint: 'Insturen en bekijken',
+      onPress: () => router.push('/ideas'),
+    });
+  }
+  device.push({
+    key: 'tour',
+    label: 'Rondleiding',
+    hint: 'Een korte wandeling door de app, start meteen',
+    onPress: startTour,
+  });
   // Zonder lijst is er niets om naartoe te gaan, dus ook geen Alle lijsten.
   if (eventCount > 0) {
     device.push({

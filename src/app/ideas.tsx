@@ -122,7 +122,7 @@ export default function IdeasScreen() {
             <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
               {group
                 ? `Wat hier staat ziet iedereen van ${group.name}. Je eigen inzending kun je terugtrekken.`
-                : 'Zonder groep zie je alleen je eigen ideeën. Sluit je aan bij een groep (Beheer, Dit toestel) om ze met de ploeg te delen.'}
+                : 'Zonder groep zie je alleen je eigen ideeën. Sluit je aan bij een groep (bij Beheer, onder Groep) om ze met de ploeg te delen.'}
             </Text>
             <Field
               value={draft}

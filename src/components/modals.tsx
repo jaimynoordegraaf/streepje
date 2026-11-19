@@ -844,7 +844,7 @@ export function SavedPeoplePickerModal({
         {available.length === 0 ? (
           <Text style={{ color: theme.textDim, fontSize: 14, lineHeight: 20 }}>
             {people.length === 0
-              ? 'Er staan nog geen vaste namen. Bij Beheer, onder Dit toestel, bij Voor nieuwe lijsten, zet je de mensen die er meestal zijn, en daar verdeel je ze ook over speltakken.'
+              ? 'Er staan nog geen vaste namen. Bij Beheer, onder Menu en vaste namen, zet je de mensen die er meestal zijn, en daar verdeel je ze ook over speltakken.'
               : 'Iedereen uit de vaste lijst staat al in deze lijst.'}
           </Text>
         ) : (

@@ -1,80 +1,42 @@
+/**
+ * Deze lijst: de naam, de correctiecode en het afsluiten of verwijderen.
+ *
+ * Dit scherm was lang: ook het menu en de prijzen en de mensen stonden erin. Die
+ * hebben sinds de Beheer-pagina elk hun eigen scherm (menu-prijzen.tsx en
+ * personen.tsx). Wat hier overblijft zijn de dingen die over de lijst als geheel
+ * gaan.
+ */
+
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
-import { Alert, type LayoutChangeEvent, Pressable, ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/text';
 
-import { MenuEditor } from '@/components/menu-editor';
-import { PromptModal, SavedPeoplePickerModal, whenAlertClosed } from '@/components/modals';
+import { PromptModal, whenAlertClosed } from '@/components/modals';
 import { PinModal } from '@/components/pin-modal';
-import { askAboutSameName } from '@/components/same-name';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
-import {
-  correctionBlock,
-  correctionsUnlocked,
-  isAdminDevice,
-  unlockCorrections,
-} from '@/lib/pin';
-import { findSameName } from '@/lib/names';
+import { correctionsUnlocked, isAdminDevice, unlockCorrections } from '@/lib/pin';
 import { useEvent, useStore } from '@/lib/store';
-import { formatDateTime } from '@/lib/export';
-import { activePeople, removedPeople } from '@/lib/totals';
-import type { Person } from '@/lib/types';
 import { space, useTheme } from '@/theme';
 
 export default function SetupScreen() {
   const theme = useTheme();
   const router = useRouter();
-  // `deel`: Beheer wijst naar een stuk van deze lange pagina. Zie sectionLayout.
-  const { id, deel } = useLocalSearchParams<{ id: string; deel?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const event = useEvent(id);
-  const scrollRef = useRef<ScrollView>(null);
-  const scrolledToPart = useRef(false);
 
   const renameEvent = useStore((state) => state.renameEvent);
   const deleteEvent = useStore((state) => state.deleteEvent);
   const setEventClosed = useStore((state) => state.setEventClosed);
   const setCorrectionPin = useStore((state) => state.setCorrectionPin);
-  const addPeople = useStore((state) => state.addPeople);
-  const defaultPeople = useStore((state) => state.defaultPeople);
-  const group = useStore((state) => state.group);
-  const roster = useStore((state) => state.roster);
-  const sections = useStore((state) => state.sections);
-  const renamePerson = useStore((state) => state.renamePerson);
-  const removePerson = useStore((state) => state.removePerson);
-  const restorePerson = useStore((state) => state.restorePerson);
-  const setPersonBilling = useStore((state) => state.setPersonBilling);
-  const setPersonNote = useStore((state) => state.setPersonNote);
-  const deviceName = useStore((state) => state.deviceName);
-  const addItem = useStore((state) => state.addItem);
-  const updateItem = useStore((state) => state.updateItem);
-  const removeItem = useStore((state) => state.removeItem);
 
   const [renamingEvent, setRenamingEvent] = useState(false);
-  const [pickingSaved, setPickingSaved] = useState(false);
-  const [renamingPerson, setRenamingPerson] = useState<Person | null>(null);
-  const [notingPerson, setNotingPerson] = useState<Person | null>(null);
   // 'change' asks for the current code first, then for the new one.
   const [pinStep, setPinStep] = useState<'none' | 'set' | 'change' | 'change-new'>('none');
-  // Who is waiting on the PIN before being removed.
-  const [removing, setRemoving] = useState<Person | null>(null);
-  const [removeAsk, setRemoveAsk] = useState<'verify' | 'set' | null>(null);
   const [deleteAsk, setDeleteAsk] = useState<'verify' | 'set' | null>(null);
   const [reopenAsk, setReopenAsk] = useState<'verify' | 'set' | null>(null);
   const bottomInset = useBottomInset();
-
-  /**
-   * Schuif naar het stuk dat Beheer aanwees (Menu en prijzen, Personen).
-   *
-   * Eén keer, en op de plek waar het stuk zichzelf meldt: de hoogte van wat erboven
-   * staat is dan bekend. Geen `scrollToEnd`, dat deed op het webdoel niets.
-   */
-  const sectionLayout = (key: string) => (e: LayoutChangeEvent) => {
-    if (deel !== key || scrolledToPart.current) return;
-    scrolledToPart.current = true;
-    const y = e.nativeEvent.layout.y;
-    setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, y - space.lg), animated: false }), 60);
-  };
 
   if (!event) {
     return (
@@ -87,69 +49,6 @@ export default function SetupScreen() {
 
   // Een lopende rekening is geen evenement, dus zo heet hij hier ook niet.
   const noun = event.kind === 'tab' ? 'Lijst' : 'Evenement';
-
-  const doRemove = (person: Person) => removePerson(id, person.id, deviceName);
-
-  /**
-   * Removing someone takes their turfs out of the total, so it is guarded
-   * exactly as removing a single turf is: an admin phone, and the PIN.
-   * Without this it was a way round the PIN entirely -- delete the person and
-   * their turfs went with them, quietly.
-   */
-  const confirmRemovePerson = (person: Person) => {
-    const block = correctionBlock(event);
-
-    if (!block.allowed && block.reason === 'not-admin') {
-      Alert.alert(
-        'Alleen op een beheertelefoon',
-        'Iemand verwijderen kan alleen op een telefoon die beheerder is van deze lijst. Een beheerder kan dat bij Beheer, onder Delen, instellen.'
-      );
-      return;
-    }
-
-    Alert.alert(
-      `${person.name} verwijderen?`,
-      'Wat er geturfd is blijft bewaard en is terug te zien bij de totalen, maar telt niet meer mee.',
-      [
-        { text: 'Annuleren', style: 'cancel' },
-        {
-          text: 'Verwijderen',
-          style: 'destructive',
-          onPress: () => {
-            if (correctionsUnlocked(id)) {
-              doRemove(person);
-              return;
-            }
-            setRemoving(person);
-            whenAlertClosed(() =>
-              setRemoveAsk(!block.allowed && block.reason === 'no-pin' ? 'set' : 'verify')
-            );
-          },
-        },
-      ]
-    );
-  };
-
-  /**
-   * Moving someone between the invoice and paying tonight decides who gets
-   * asked for the money, so it is an admin's call, confirmed once first.
-   */
-  const confirmBillingChange = (person: Person) => {
-    const toInvoice = person.billing !== 'invoice';
-    Alert.alert(
-      toInvoice ? person.name + ' op de factuur zetten?' : person.name + ' vanavond laten betalen?',
-      toInvoice
-        ? 'Wat ' + person.name + ' turft gaat dan naar de penningmeester. Doe dit alleen als diens gegevens bekend zijn.'
-        : 'Wat ' + person.name + ' turft moet dan aan het eind van de avond betaald worden.',
-      [
-        { text: 'Annuleren', style: 'cancel' },
-        {
-          text: toInvoice ? 'Op factuur' : 'Vanavond',
-          onPress: () => setPersonBilling(id, person.id, toInvoice ? 'invoice' : 'tonight'),
-        },
-      ]
-    );
-  };
 
   const doDeleteEvent = () => {
     deleteEvent(id);
@@ -220,27 +119,20 @@ export default function SetupScreen() {
     setReopenAsk(null);
   };
 
-  /** How many of this item have already been logged across everyone. */
-  const loggedCount = (itemId: string) =>
-    event.entries.reduce((sum, entry) => (entry.itemId === itemId ? sum + entry.delta : sum), 0);
-
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Deze lijst' }} />
 
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: 48 + bottomInset }}>
+      <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: 48 + bottomInset }}>
         <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-          Voor {event.name}. Wat je hier verandert, geldt alleen voor deze lijst. Wat voor het hele
-          toestel geldt staat bij Beheer, onder Dit toestel.
+          Voor {event.name}. Wat je hier verandert, geldt alleen voor deze lijst.
         </Text>
 
         <View style={{ gap: space.sm }}>
           <SectionTitle>Correctiecode</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
             {isAdminDevice(event)
-              ? 'Zonder deze code kan niemand op deze telefoon een turfje weghalen. Turven zelf blijft gewoon één tik. Dezelfde code opent ook Beheer in het menu, met Totalen, Logboek, Delen, Deze lijst, Dit toestel en Alle lijsten. De code staat alleen op deze telefoon, elke beheertelefoon heeft zijn eigen, en een vergeten code is niet te herstellen: schrijf hem op.'
+              ? 'Zonder deze code kan niemand op deze telefoon een turfje weghalen. Turven zelf blijft gewoon één tik. Dezelfde code opent ook Beheer in het menu. De code staat alleen op deze telefoon, elke beheertelefoon heeft zijn eigen, en een vergeten code is niet te herstellen: schrijf hem op.'
               : 'Turfjes weghalen kan alleen op een beheertelefoon. Op deze telefoon kun je wel turven, maar niets weghalen. Een beheerder kan deze telefoon beheerder maken bij Beheer, onder Delen.'}
           </Text>
 
@@ -282,140 +174,6 @@ export default function SetupScreen() {
           </Card>
         </View>
 
-        <View style={{ gap: space.sm }} onLayout={sectionLayout('menu')}>
-          <SectionTitle>Menu en prijzen</SectionTitle>
-          <Text style={{ color: theme.textDim, fontSize: 13, marginBottom: space.xs }}>
-            {isAdminDevice(event)
-              ? 'Prijzen hier gelden alleen voor deze lijst. Een nieuwe prijs geldt voor wat je vanaf nu turft; wat al geturfd is houdt zijn prijs.'
-              : 'Alleen een beheertelefoon kan het menu en de prijzen aanpassen.'}
-          </Text>
-          <MenuEditor
-            items={event.menu}
-            readOnly={!isAdminDevice(event)}
-            onAdd={(draft) => addItem(id, draft)}
-            onUpdate={(itemId, patch) => updateItem(id, itemId, patch)}
-            onRemove={(itemId) => removeItem(id, itemId)}
-            removeWarning={(item) => {
-              const count = loggedCount(item.id);
-              // Removing only hides the item: turfs already made keep counting.
-              return count > 0
-                ? `${count} keer geturfd. Die turfjes blijven meetellen; het item verdwijnt alleen van het menu.`
-                : null;
-            }}
-          />
-        </View>
-
-        <View style={{ gap: space.sm }} onLayout={sectionLayout('personen')}>
-          <SectionTitle>{event.kind === 'tab' ? 'Leden' : 'Personen'}</SectionTitle>
-          {activePeople(event).length === 0 ? (
-            <EmptyState title="Nog niemand toegevoegd" />
-          ) : (
-            activePeople(event).map((person) => (
-              <Card key={person.id} style={{ paddingVertical: space.md }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>
-                      {person.name}
-                    </Text>
-                    {event.kind === 'event' ? (
-                      <Pressable
-                        disabled={!isAdminDevice(event)}
-                        onPress={() => confirmBillingChange(person)}
-                        hitSlop={6}>
-                        <Text
-                          style={{
-                            color: isAdminDevice(event) ? theme.link : theme.textDim,
-                            fontSize: 12,
-                            marginTop: 2,
-                          }}>
-                          {person.billing === 'invoice' ? 'Op factuur' : 'Betaalt vanavond'}
-                          {person.memberId ? ' · lid' : ''}
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                  <Pressable onPress={() => setRenamingPerson(person)} hitSlop={8}>
-                    <Text style={{ color: theme.link, fontWeight: '600' }}>Hernoemen</Text>
-                  </Pressable>
-                  {/* Alleen voor gasten: bij een lid staat de naam al vast in
-                      de lopende rekening, en die hoort bij de penningmeester
-                      thuis onder zijn eigen naam. */}
-                  {person.memberId === null ? (
-                    <Pressable onPress={() => setNotingPerson(person)} hitSlop={8}>
-                      <Text style={{ color: theme.link, fontWeight: '600' }}>Toevoeging</Text>
-                    </Pressable>
-                  ) : null}
-                  {/* Removing someone changes the takings, so not on a closed event. */}
-                  {event.closed ? null : (
-                    <Pressable onPress={() => confirmRemovePerson(person)} hitSlop={8}>
-                      <Text style={{ color: theme.danger, fontWeight: '600' }}>Verwijderen</Text>
-                    </Pressable>
-                  )}
-                </View>
-              </Card>
-            ))
-          )}
-          {removedPeople(event).length > 0 ? (
-            <View style={{ gap: space.sm, marginTop: space.sm }}>
-              <Text style={{ color: theme.textDim, fontSize: 13, fontWeight: '700' }}>
-                VERWIJDERD
-              </Text>
-              {removedPeople(event).map((person) => (
-                <Card key={person.id} style={{ paddingVertical: space.md }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: theme.textDim, fontSize: 16, fontWeight: '600' }}>
-                        {person.name}
-                      </Text>
-                      <Text style={{ color: theme.textDim, fontSize: 12 }}>
-                        {person.removedAt ? formatDateTime(person.removedAt) : ''}
-                        {person.removedBy ? ` · ${person.removedBy}` : ''}
-                      </Text>
-                    </View>
-                    {isAdminDevice(event) && !event.closed ? (
-                      <Pressable onPress={() => restorePerson(id, person.id)} hitSlop={8}>
-                        <Text style={{ color: theme.link, fontWeight: '600' }}>Terugzetten</Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                </Card>
-              ))}
-            </View>
-          ) : null}
-
-          {event.closed ? (
-            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-              Dit evenement is afgesloten. Heropen het om iemand toe te voegen of te verwijderen.
-            </Text>
-          ) : (
-            // Een naam erbij zetten doe je in het menu van de lijst: daar kijkt de
-            // app of de naam er al staat. Hier stond een tweede knop die hetzelfde
-            // deed, zonder die controle.
-            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-              Iemand erbij? Via het menu ⋯ van de lijst, onder Voor de bar.
-            </Text>
-          )}
-
-          {/* Zodra de groep een ledenlijst heeft, kies je daaruit via het menu van de
-              lijst (Lid toevoegen). De Vaste namen van dit toestel zijn dan overgenomen. */}
-          {defaultPeople.length > 0 &&
-          !event.closed &&
-          !(roster && roster.groupId === group?.id && roster.members.some((m) => m.removedAt === null)) ? (
-            <Button
-              title={`Vaste namen toevoegen (${
-                defaultPeople.filter(
-                  (saved) =>
-                    !event.people.some(
-                      (person) => person.name.toLowerCase() === saved.name.toLowerCase()
-                    )
-                ).length
-              })`}
-              variant="secondary"
-              onPress={() => setPickingSaved(true)}
-            />
-          ) : null}
-        </View>
-
         <View style={{ gap: space.sm }}>
           <SectionTitle>Afronden</SectionTitle>
           {/* A season tab runs for good, so there is nothing to close. */}
@@ -448,18 +206,6 @@ export default function SetupScreen() {
         }}
       />
 
-      <SavedPeoplePickerModal
-        visible={pickingSaved}
-        people={defaultPeople}
-        sections={sections}
-        alreadyIn={event.people.map((person) => person.name)}
-        onCancel={() => setPickingSaved(false)}
-        onSubmit={(names) => {
-          addPeople(id, names);
-          setPickingSaved(false);
-        }}
-      />
-
       <PinModal
         visible={pinStep === 'set' || pinStep === 'change-new'}
         mode="set"
@@ -482,36 +228,6 @@ export default function SetupScreen() {
         explanation="Voer eerst de huidige code in."
         onCancel={() => setPinStep('none')}
         onVerified={() => setPinStep('change-new')}
-      />
-
-      <PinModal
-        visible={removeAsk !== null}
-        mode={removeAsk === 'set' ? 'set' : 'verify'}
-        eventId={id}
-        record={event.correctionPin}
-        title={removing ? `${removing.name} verwijderen` : 'Verwijderen'}
-        explanation={
-          removeAsk === 'set'
-            ? 'Er is nog geen correctiecode. Kies er een; die is vanaf nu nodig om te verwijderen.'
-            : 'Voer de code in om deze persoon te verwijderen.'
-        }
-        onCancel={() => {
-          setRemoving(null);
-          setRemoveAsk(null);
-        }}
-        onVerified={() => {
-          unlockCorrections(id);
-          if (removing) doRemove(removing);
-          setRemoving(null);
-          setRemoveAsk(null);
-        }}
-        onSet={(record) => {
-          setCorrectionPin(id, record);
-          unlockCorrections(id);
-          if (removing) doRemove(removing);
-          setRemoving(null);
-          setRemoveAsk(null);
-        }}
       />
 
       <PinModal
@@ -553,40 +269,6 @@ export default function SetupScreen() {
         onSet={(record) => {
           setCorrectionPin(id, record);
           reopen();
-        }}
-      />
-
-      <PromptModal
-        visible={notingPerson !== null}
-        title={notingPerson ? `Toevoeging bij ${notingPerson.name}` : 'Toevoeging'}
-        placeholder="bijv. Scouting Nehalennia"
-        initialValue={notingPerson?.note ?? ''}
-        submitLabel="Opslaan"
-        onCancel={() => setNotingPerson(null)}
-        onSubmit={(value) => {
-          if (notingPerson) setPersonNote(id, notingPerson.id, value);
-          setNotingPerson(null);
-        }}
-      />
-
-      <PromptModal
-        visible={renamingPerson !== null}
-        title="Persoon hernoemen"
-        initialValue={renamingPerson?.name ?? ''}
-        onCancel={() => setRenamingPerson(null)}
-        onSubmit={(name) => {
-          const person = renamingPerson;
-          setRenamingPerson(null);
-          if (!person) return;
-          // Hernoemen naar een naam die er al staat geeft twee regels voor één
-          // mens; eerst vragen. De eigen naam met andere hoofdletters mag.
-          const match = findSameName(event, name, person.id);
-          if (!match) return renamePerson(id, person.id, name);
-          askAboutSameName({
-            match,
-            proceedLabel: 'Toch hernoemen',
-            onProceed: () => renamePerson(id, person.id, name),
-          });
         }}
       />
     </Screen>
