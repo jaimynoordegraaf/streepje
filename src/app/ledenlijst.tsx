@@ -66,7 +66,7 @@ export default function RosterScreen() {
         <Stack.Screen options={{ title: 'Ledenlijst' }} />
         <EmptyState
           title="Deze telefoon zit in geen groep"
-          hint="De ledenlijst hoort bij de groep. Maak of kies een groep onder Dit toestel; daarna staat hij op alle telefoons van de groep."
+          hint="De ledenlijst hoort bij de groep. Maak of kies een groep bij Beheer, onder Dit toestel; daarna staat hij op alle telefoons van de groep."
         />
       </Screen>
     );

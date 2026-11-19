@@ -27,7 +27,7 @@ function NoListScreen() {
   const createEvent = useStore((state) => state.createEvent);
   const { shareIntoGroup } = useGroupSync();
   const menu = useDropdown();
-  const items = useGlobalItems({ hideLists: eventCount === 0 });
+  const items = useGlobalItems();
 
   return (
     <Screen>

@@ -10,8 +10,9 @@
  * platforms hetzelfde, inclusief de terugknop van Android die hem sluit.
  *
  * Het menu heeft twee lagen. Wat de barploeg nodig heeft staat bovenaan en is
- * open. Alles eronder (totalen, logboek, delen, deze lijst, dit toestel, alle
- * lijsten) zit achter de beheercode: zie `gate` in DropdownMenu.
+ * open. Daaronder staat één item, Beheer, achter de beheercode (zie `gate` in
+ * DropdownMenu). Totalen, logboek, delen, deze lijst, dit toestel en alle lijsten
+ * staan op de Beheer-pagina (components/beheer-page.tsx).
  *
  * De staat van het menu (open of dicht) hoort in het scherm, niet in de kop.
  * Een `headerRight: () => <...>` is bij elke render van het scherm een nieuw
@@ -37,6 +38,8 @@ export type DropdownItem = {
   label: string;
   /** Een regel eronder, bijvoorbeeld de stand van het delen. */
   hint?: string;
+  /** De regel eronder in het rood: iets wat aandacht vraagt. */
+  hintAlert?: boolean;
   onPress: () => void;
   /** Een scheidingslijn boven dit item, om groepen uit elkaar te houden. */
   separated?: boolean;
@@ -141,12 +144,13 @@ export function DropdownMenu({
   const [asking, setAsking] = useState<{ mode: 'verify' | 'set'; open: () => void } | null>(null);
 
   /**
-   * Het slot op het onderste blok van het menu.
+   * Het slot op het item Beheer.
    *
    * Het gebruikt de code die er al is: de correctiecode van de lijst waar de
    * app mee opent, zoals de weergave onder Dit toestel. Er komt
-   * geen tweede code bij. Na een goede code staat alles twee minuten open (het
-   * venster van pin.ts), dus Totalen en dan Logboek vraagt maar één keer.
+   * geen tweede code bij. Na een goede code staat het twee minuten open (het
+   * venster van pin.ts): wie de Beheer-pagina verlaat en binnen twee minuten
+   * terugkomt, krijgt de code niet opnieuw te zien.
    *
    * Een telefoon die geen beheerder is van die lijst heeft geen code en komt
    * er zonder doorheen: wat daar gevaarlijk is, weigert de database toch al.
@@ -238,7 +242,13 @@ export function DropdownMenu({
                   {item.label}
                 </Text>
                 {item.hint ? (
-                  <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 2 }}>
+                  <Text
+                    style={{
+                      color: item.hintAlert ? theme.danger : theme.textDim,
+                      fontSize: 12,
+                      marginTop: 2,
+                      fontWeight: item.hintAlert ? '700' : '400',
+                    }}>
                     {item.hint}
                   </Text>
                 ) : null}
@@ -272,20 +282,14 @@ export function DropdownMenu({
 }
 
 /**
- * Het deel van het menu dat overal hetzelfde is: naar de andere lijsten en de
- * instellingen. Beide achter de beheercode.
+ * Het menu van het lege beginscherm, waar nog geen lijst is: alleen Beheer.
  *
- * Nieuwe lijst en Deelnemen met code staan hier niet meer: ze zitten op Alle
- * lijsten, onderin. `hideLists` voor het lege beginscherm, waar nog geen lijst
- * is om naartoe te gaan.
+ * Met een lijst bouwt het lijstscherm zijn eigen Beheer-item (het hoort bij die
+ * lijst, en kent de stand van het delen). Zonder lijst opent Beheer met alleen
+ * wat voor het toestel geldt. Er is dan ook geen code om te vragen: `gate`
+ * laat een telefoon zonder lijst zonder door.
  */
-export function useGlobalItems({ hideLists = false }: { hideLists?: boolean } = {}): DropdownItem[] {
+export function useGlobalItems(): DropdownItem[] {
   const router = useRouter();
-  const items: DropdownItem[] = [];
-
-  if (!hideLists) {
-    items.push({ label: 'Alle lijsten', onPress: () => router.push('/lists'), locked: true });
-  }
-  items.push({ label: 'Dit toestel', onPress: () => router.push('/settings'), locked: true });
-  return items;
+  return [{ label: 'Beheer', onPress: () => router.push('/beheer'), locked: true }];
 }

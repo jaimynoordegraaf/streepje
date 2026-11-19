@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, type LayoutChangeEvent, Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/text';
 
@@ -25,8 +25,11 @@ import { space, useTheme } from '@/theme';
 export default function SetupScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `deel`: Beheer wijst naar een stuk van deze lange pagina. Zie sectionLayout.
+  const { id, deel } = useLocalSearchParams<{ id: string; deel?: string }>();
   const event = useEvent(id);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledToPart = useRef(false);
 
   const renameEvent = useStore((state) => state.renameEvent);
   const deleteEvent = useStore((state) => state.deleteEvent);
@@ -60,6 +63,19 @@ export default function SetupScreen() {
   const [reopenAsk, setReopenAsk] = useState<'verify' | 'set' | null>(null);
   const bottomInset = useBottomInset();
 
+  /**
+   * Schuif naar het stuk dat Beheer aanwees (Menu en prijzen, Personen).
+   *
+   * Eén keer, en op de plek waar het stuk zichzelf meldt: de hoogte van wat erboven
+   * staat is dan bekend. Geen `scrollToEnd`, dat deed op het webdoel niets.
+   */
+  const sectionLayout = (key: string) => (e: LayoutChangeEvent) => {
+    if (deel !== key || scrolledToPart.current) return;
+    scrolledToPart.current = true;
+    const y = e.nativeEvent.layout.y;
+    setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, y - space.lg), animated: false }), 60);
+  };
+
   if (!event) {
     return (
       <Screen>
@@ -86,7 +102,7 @@ export default function SetupScreen() {
     if (!block.allowed && block.reason === 'not-admin') {
       Alert.alert(
         'Alleen op een beheertelefoon',
-        'Iemand verwijderen kan alleen op een telefoon die beheerder is van deze lijst. Een beheerder kan dat onder Delen instellen.'
+        'Iemand verwijderen kan alleen op een telefoon die beheerder is van deze lijst. Een beheerder kan dat bij Beheer, onder Delen, instellen.'
       );
       return;
     }
@@ -212,18 +228,20 @@ export default function SetupScreen() {
     <Screen>
       <Stack.Screen options={{ title: 'Deze lijst' }} />
 
-      <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: 48 + bottomInset }}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: 48 + bottomInset }}>
         <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
           Voor {event.name}. Wat je hier verandert, geldt alleen voor deze lijst. Wat voor het hele
-          toestel geldt staat onder Dit toestel.
+          toestel geldt staat bij Beheer, onder Dit toestel.
         </Text>
 
         <View style={{ gap: space.sm }}>
           <SectionTitle>Correctiecode</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
             {isAdminDevice(event)
-              ? 'Zonder deze code kan niemand op deze telefoon een turfje weghalen. Turven zelf blijft gewoon één tik. Dezelfde code opent ook het onderste deel van het menu: Totalen, Logboek, Delen, Deze lijst, Dit toestel en Alle lijsten. De code staat alleen op deze telefoon, elke beheertelefoon heeft zijn eigen, en een vergeten code is niet te herstellen: schrijf hem op.'
-              : 'Turfjes weghalen kan alleen op een beheertelefoon. Op deze telefoon kun je wel turven, maar niets weghalen. Een beheerder kan deze telefoon beheerder maken onder Delen.'}
+              ? 'Zonder deze code kan niemand op deze telefoon een turfje weghalen. Turven zelf blijft gewoon één tik. Dezelfde code opent ook Beheer in het menu, met Totalen, Logboek, Delen, Deze lijst, Dit toestel en Alle lijsten. De code staat alleen op deze telefoon, elke beheertelefoon heeft zijn eigen, en een vergeten code is niet te herstellen: schrijf hem op.'
+              : 'Turfjes weghalen kan alleen op een beheertelefoon. Op deze telefoon kun je wel turven, maar niets weghalen. Een beheerder kan deze telefoon beheerder maken bij Beheer, onder Delen.'}
           </Text>
 
           {isAdminDevice(event) ? (
@@ -264,7 +282,7 @@ export default function SetupScreen() {
           </Card>
         </View>
 
-        <View style={{ gap: space.sm }}>
+        <View style={{ gap: space.sm }} onLayout={sectionLayout('menu')}>
           <SectionTitle>Menu en prijzen</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, marginBottom: space.xs }}>
             {isAdminDevice(event)
@@ -287,7 +305,7 @@ export default function SetupScreen() {
           />
         </View>
 
-        <View style={{ gap: space.sm }}>
+        <View style={{ gap: space.sm }} onLayout={sectionLayout('personen')}>
           <SectionTitle>{event.kind === 'tab' ? 'Leden' : 'Personen'}</SectionTitle>
           {activePeople(event).length === 0 ? (
             <EmptyState title="Nog niemand toegevoegd" />

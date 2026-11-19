@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BackIcon } from '@/components/icons';
 import { TourOverlay } from '@/components/tour';
 import { UndoStrip } from '@/components/undo-strip';
+import { noteTouch } from '@/lib/beheer';
 import { flushPendingAfterStart, usePending } from '@/lib/pending';
 import { useStore } from '@/lib/store';
 import { font, space, type as typeScale, useTheme } from '@/theme';
@@ -126,7 +127,8 @@ export default function RootLayout() {
       <ThemeProvider value={navigationTheme}>
         {/* De rondleiding hangt naast de navigatie en niet erin, zodat hij
             blijft staan terwijl hij zelf van scherm naar scherm vaart. */}
-        <View style={{ flex: 1 }}>
+        {/* onTouchStart meldt elke aanraking aan de tijd-uit van Beheer (lib/beheer.ts). */}
+        <View style={{ flex: 1 }} onTouchStart={noteTouch}>
           <Stack
             screenOptions={({ navigation }) => ({
               headerStyle: { backgroundColor: theme.card },

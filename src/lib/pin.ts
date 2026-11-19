@@ -153,3 +153,14 @@ export function correctionsUnlocked(eventId: string): boolean {
   }
   return true;
 }
+
+/**
+ * Hoeveel seconden het venster na een goede code nog openstaat, of 0 als het
+ * dicht is. Voor de regel op de Beheer-pagina; het slot zelf gebruikt
+ * `correctionsUnlocked`.
+ */
+export function unlockSecondsLeft(eventId: string): number {
+  const until = unlocked.get(eventId);
+  if (!until || until <= Date.now()) return 0;
+  return Math.ceil((until - Date.now()) / 1000);
+}

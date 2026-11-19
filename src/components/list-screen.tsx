@@ -20,7 +20,6 @@ import {
   DropdownMenu,
   MenuButton,
   useDropdown,
-  useGlobalItems,
   type DropdownItem,
 } from '@/components/menu';
 import { BellIcon } from '@/components/bell';
@@ -183,7 +182,6 @@ export function ListScreen({ id }: { id: string }) {
   const [adding, setAdding] = useState<'name' | 'guest' | 'members' | null>(null);
   const { status, pending, detailsPending } = useEventSync(event);
   const menu = useDropdown();
-  const globalItems = useGlobalItems();
   // Eerst wie dit seizoen streepjes heeft, op alfabet, dan de rest. Bepaald als
   // de lijst opent en vast tijdens het turven (zie use-list-order.ts).
   const ordered = useListOrder(event, true);
@@ -300,28 +298,16 @@ export function ListScreen({ id }: { id: string }) {
   const items: DropdownItem[] = [
     ...adders.map((item, index) => (index === 0 ? { ...item, heading: 'Voor de bar' } : item)),
     {
-      label: 'Totalen en betalen',
-      onPress: () => router.push({ pathname: '/event/[id]/totals', params: { id } }),
+      // Alles achter de beheercode staat op één pagina. Het rode puntje op de
+      // drie puntjes (sharing.problem) heeft daarmee geen eigen uitleg meer in
+      // het menu, dus die komt hier als regel onder Beheer.
+      label: 'Beheer',
+      hint: sharing.problem ? sharing.label : undefined,
+      hintAlert: sharing.problem,
       heading: 'Achter de beheercode',
+      onPress: () => router.push({ pathname: '/event/[id]/beheer', params: { id } }),
       locked: true,
     },
-    {
-      label: 'Logboek',
-      onPress: () => router.push({ pathname: '/event/[id]/log', params: { id } }),
-      locked: true,
-    },
-    {
-      label: 'Deze lijst',
-      onPress: () => router.push({ pathname: '/event/[id]/setup', params: { id } }),
-      locked: true,
-    },
-    {
-      label: event.share ? 'Delen beheren' : 'Delen',
-      hint: sharing.label,
-      onPress: () => router.push({ pathname: '/event/[id]/share', params: { id } }),
-      locked: true,
-    },
-    ...globalItems,
   ];
 
   return (

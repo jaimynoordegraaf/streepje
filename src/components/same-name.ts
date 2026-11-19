@@ -34,7 +34,7 @@ export function askAboutSameName({
     if (removed) {
       Alert.alert(
         `${person.name} is eerder verwijderd`,
-        'Wat die persoon had staat nog in het logboek. Een beheerder kan hem terugzetten onder Deze lijst, dan komt alles weer op één regel. Een nieuwe naam maakt een tweede regel.',
+        'Wat die persoon had staat nog in het logboek. Een beheerder kan hem terugzetten bij Beheer, dan komt alles weer op één regel. Een nieuwe naam maakt een tweede regel.',
         [
           { text: 'Annuleren', style: 'cancel' },
           { text: proceedLabel, onPress: onProceed },

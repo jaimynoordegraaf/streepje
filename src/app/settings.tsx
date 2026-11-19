@@ -140,8 +140,8 @@ export default function SettingsScreen() {
 
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: 48 + bottomInset }}>
         <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-          Wat voor dit toestel geldt, voor alle lijsten. Wat bij één lijst hoort staat in het menu
-          onder Deze lijst.
+          Wat voor dit toestel geldt, voor alle lijsten. Wat bij één lijst hoort staat bij Beheer, onder De lijst
+          instellen.
         </Text>
 
         <View style={{ gap: space.sm }}>

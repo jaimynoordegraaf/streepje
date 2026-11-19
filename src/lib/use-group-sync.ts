@@ -105,7 +105,7 @@ export function useGroupSync(syncOnFocus = false) {
         Alert.alert(
           'Niet in de groep gezet',
           describeError(error) +
-            '\n\nDe lijst staat wel op deze telefoon. Je kunt hem later alsnog delen via het menu, onder Delen.'
+            '\n\nDe lijst staat wel op deze telefoon. Je kunt hem later alsnog delen via het menu, bij Beheer, onder Delen.'
         );
       }
     },
