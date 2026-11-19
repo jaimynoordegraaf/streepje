@@ -6,10 +6,16 @@
  * terugnemen. Hij is alleen zichtbaar zolang er iets wacht en ligt over de
  * onderkant van het scherm, dus er verschuift niets onder een vinger.
  *
- * Per persoon en drankje één blokje; "Ongedaan maken" haalt daar de nieuwste
- * streep af. Alles deelt één klok, de balk onderin (zie pending.ts).
+ * Per persoon en drankje één blokje ("Bier × 3 voor Anna"); "Ongedaan maken"
+ * haalt daar alles van af. Alles deelt één klok, de
+ * balk onderin (zie pending.ts).
+ *
+ * Alleen een bezoek dat al gesloten is staat hier. Zolang een persoonsscherm
+ * openstaat heeft het zijn eigen ✕ en is deze strook niet nodig, dus daar
+ * blijft hij weg.
  */
 
+import { usePathname } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, View } from 'react-native';
 
@@ -24,8 +30,8 @@ type Group = {
   itemName: string;
   personName: string;
   count: number;
-  /** De nieuwste streep van deze groep: die haalt "ongedaan maken" weg. */
-  lastId: string;
+  /** Alle regels van deze groep: die haalt "ongedaan maken" weg, zodat het getal op het blokje klopt. */
+  ids: string[];
 };
 
 export function UndoStrip() {
@@ -36,23 +42,25 @@ export function UndoStrip() {
   const restarts = usePending((state) => state.restarts);
   const undo = usePending((state) => state.undo);
   const events = useStore((state) => state.events);
+  const onPersonScreen = usePathname().includes('/person/');
 
   const groups = useMemo(() => {
     const result: Group[] = [];
-    for (const { eventId, entry } of waiting) {
+    for (const { eventId, entry, open } of waiting) {
+      if (open) continue;
       const event = events.find((candidate) => candidate.id === eventId);
       const key = eventId + '|' + entry.personId + '|' + entry.itemId;
       const existing = result.find((group) => group.key === key);
       if (existing) {
-        existing.count += 1;
-        existing.lastId = entry.id;
+        existing.count += entry.delta;
+        existing.ids.push(entry.id);
       } else {
         result.push({
           key,
           itemName: event?.menu.find((item) => item.id === entry.itemId)?.name ?? 'Consumptie',
           personName: event?.people.find((person) => person.id === entry.personId)?.name ?? '?',
-          count: 1,
-          lastId: entry.id,
+          count: entry.delta,
+          ids: [entry.id],
         });
       }
     }
@@ -77,7 +85,7 @@ export function UndoStrip() {
     return () => animation.stop();
   }, [restarts, deadline, progress]);
 
-  if (groups.length === 0) return null;
+  if (groups.length === 0 || onPersonScreen) return null;
 
   return (
     <View
@@ -118,7 +126,7 @@ export function UndoStrip() {
               <Text style={{ color: '#B9B9BE', fontSize: 12 }}>voor {group.personName}</Text>
             </View>
             <Pressable
-              onPress={() => undo(group.lastId)}
+              onPress={() => group.ids.forEach(undo)}
               accessibilityRole="button"
               accessibilityLabel={`Ongedaan maken: ${group.itemName} voor ${group.personName}`}
               hitSlop={6}

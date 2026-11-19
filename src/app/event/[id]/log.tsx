@@ -66,7 +66,7 @@ function dayTitle(at: number): string {
   return date.getFullYear() === today.getFullYear() ? base : `${base} ${date.getFullYear()}`;
 }
 
-/** Kies Ã©Ã©n persoon om het logboek op te filteren. */
+/** Kies één persoon om het logboek op te filteren. */
 function PersonPicker({
   visible,
   options,
@@ -228,7 +228,11 @@ export default function LogScreen() {
 
     const what =
       row.kind === 'turf'
-        ? `${row.delta > 0 ? '+' : 'âˆ’'}${Math.abs(row.delta)} ${row.item}`
+        ? // Een bezoek aan het persoonsscherm is één regel: 3× Bier. Een
+          // correctie blijft een min.
+          row.delta > 0
+          ? `${row.delta}× ${row.item}`
+          : `−${Math.abs(row.delta)} ${row.item}`
         : row.kind === 'round'
           ? row.what
           : row.kind === 'payment'
@@ -242,7 +246,7 @@ export default function LogScreen() {
       row.kind === 'payment'
         ? 'Stand van nu, geen geschiedenis'
         : row.kind === 'round'
-          ? `${received ? `kreeg van ${row.giver}` : `voor ${row.names}`}${device ? ` Â· op ${device}` : ''}`
+          ? `${received ? `kreeg van ${row.giver}` : `voor ${row.names}`}${device ? ` · op ${device}` : ''}`
           : device
             ? `op ${device}`
             : 'telefoon onbekend';
@@ -280,7 +284,7 @@ export default function LogScreen() {
           title: 'Logboek',
           // Altijd het hele logboek, ook als hieronder een persoon gekozen is.
           headerRight: () => (
-            <HeaderButton title={exporting ? 'Bezigâ€¦' : 'Exporteren'} onPress={runExport} />
+            <HeaderButton title={exporting ? 'Bezig…' : 'Exporteren'} onPress={runExport} />
           ),
         }}
       />
@@ -292,8 +296,9 @@ export default function LogScreen() {
         ListHeaderComponent={
           <View style={{ gap: space.sm, marginBottom: space.sm }}>
             <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-              Elke tik staat hier apart, met de telefoon waarop hij is gezet. Een rondje staat als
-              Ã©Ã©n regel. Betalingen en verwijderingen tonen de stand van nu; daarvan bewaart de
+              Wat je in één keer op een persoonsscherm streept staat hier als één regel per
+              drankje (3× Bier), met de telefoon waarop het is gezet. Een rondje staat als één
+              regel. Betalingen en verwijderingen tonen de stand van nu; daarvan bewaart de
               app geen geschiedenis.
             </Text>
             <Choice
@@ -338,7 +343,7 @@ export default function LogScreen() {
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
-                  <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16 }}>âœ•</Text>
+                  <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16 }}>✕</Text>
                 </Pressable>
               ) : null}
             </View>

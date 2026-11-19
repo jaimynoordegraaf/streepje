@@ -1,21 +1,25 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
-
-import { CheckIcon } from '@/components/icons';
+import {
+  OrderPicker,
+  chosenDrinks,
+  describeDrinks,
+  useOrderPicker,
+} from '@/components/order-picker';
 import { Text } from '@/components/text';
-import { BottomBar, Button, Card, EmptyState, Screen, SectionTitle } from '@/components/ui';
+import { BottomBar, Button, EmptyState, Screen } from '@/components/ui';
 import { formatCents } from '@/lib/money';
 import { useEvent, useHideAmounts, useStore } from '@/lib/store';
-import { activeMenu, activePeople } from '@/lib/totals';
-import { radius, space, useTheme } from '@/theme';
+import { useListOrder } from '@/lib/use-list-order';
+import { activeMenu } from '@/lib/totals';
+import { space, useTheme } from '@/theme';
 
 /**
- * Putting one drink on several people at once, each on their own account.
+ * Putting drinks on several people at once, each on their own account.
  *
  * At a bar people order together, and doing that person by person means leaving
- * and re-entering a screen for every name. Here the item is chosen once and the
- * names are ticked off, which is how the order was given in the first place.
+ * and re-entering a screen for every name. Here the drink is chosen once at the
+ * top and the names are ticked off; then the next drink and the next names, so a
+ * whole order goes in at once. Kiezen werkt zoals bij Rondje (order-picker.tsx).
  *
  * Dit heette eerst Rondje. Een rondje is nu iets anders (rondje.tsx): daar
  * betaalt één persoon voor de rest. Hier turft ieder voor zichzelf.
@@ -29,9 +33,9 @@ export default function TegelijkTurvenScreen() {
   // Op de iPad staan er streepjes en geen bedragen; dan hoort hier ook geen
   // rondjestotaal.
   const hideAmounts = useHideAmounts();
-
-  const [itemId, setItemId] = useState<string | null>(null);
-  const [chosen, setChosen] = useState<string[]>([]);
+  // Dezelfde volgorde als de lijst waar je vandaan komt.
+  const people = useListOrder(event, false);
+  const picker = useOrderPicker();
 
   if (!event) {
     return (
@@ -52,19 +56,14 @@ export default function TegelijkTurvenScreen() {
     );
   }
 
-  const item = activeMenu(event).find((candidate) => candidate.id === itemId) ?? null;
-  const ready = item !== null && chosen.length > 0;
-
-  const toggle = (personId: string) =>
-    setChosen((current) =>
-      current.includes(personId)
-        ? current.filter((each) => each !== personId)
-        : [...current, personId]
-    );
+  const menu = activeMenu(event);
+  const drinks = chosenDrinks(picker, people, menu);
+  const cents = drinks.reduce((sum, drink) => sum + drink.item.priceCents, 0);
+  const ready = drinks.length > 0;
 
   const confirm = () => {
-    if (!item) return;
-    for (const personId of chosen) addOrder(id, personId, item.id, 1);
+    // Elke naam op zijn eigen rekening, met zijn eigen drankje.
+    for (const drink of drinks) addOrder(id, drink.personId, drink.item.id, 1);
     router.back();
   };
 
@@ -76,10 +75,10 @@ export default function TegelijkTurvenScreen() {
             title={
               ready
                 ? hideAmounts
-                  ? `${chosen.length}× ${item.name}`
-                  : `${chosen.length}× ${item.name} · ${formatCents(chosen.length * item.priceCents)}`
-                : item === null
-                  ? 'Kies eerst wat'
+                  ? `Turf ${drinks.length}×`
+                  : `Turf ${drinks.length}× · ${formatCents(cents)}`
+                : picker.pick === null
+                  ? 'Kies eerst een drankje'
                   : 'Kies voor wie'
             }
             disabled={!ready}
@@ -90,96 +89,21 @@ export default function TegelijkTurvenScreen() {
       }>
       <Stack.Screen options={{ title: 'Tegelijk turven' }} />
 
-      <FlatList
-        data={activePeople(event)}
-        keyExtractor={(person) => person.id}
-        contentContainerStyle={{ padding: space.lg, gap: space.sm, paddingBottom: space.xxl }}
-        ListHeaderComponent={
-          <View style={{ gap: space.sm, marginBottom: space.sm }}>
-            <SectionTitle>Wat</SectionTitle>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-              {activeMenu(event).map((candidate) => {
-                const active = candidate.id === itemId;
-                return (
-                  <Pressable
-                    key={candidate.id}
-                    onPress={() => setItemId(candidate.id)}
-                    style={({ pressed }) => ({
-                      paddingVertical: space.sm,
-                      paddingHorizontal: space.md,
-                      borderRadius: radius.pill,
-                      backgroundColor: active ? theme.accent : theme.chip,
-                      opacity: pressed ? 0.7 : 1,
-                    })}>
-                    <Text
-                      style={{
-                        color: active ? theme.onAccent : theme.text,
-                        fontWeight: '600',
-                        fontSize: 14,
-                      }}>
-                      {hideAmounts ? candidate.name : `${candidate.name} · ${formatCents(candidate.priceCents)}`}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginTop: space.md,
-                gap: space.sm,
-              }}>
-              <View style={{ flex: 1 }}>
-                <SectionTitle>Voor wie</SectionTitle>
-              </View>
-              <Pressable
-                onPress={() =>
-                  setChosen(
-                    chosen.length === activePeople(event).length
-                      ? []
-                      : activePeople(event).map((person) => person.id)
-                  )
-                }
-                hitSlop={10}>
-                <Text style={{ color: theme.link, fontSize: 14, fontWeight: '600' }}>
-                  {chosen.length === activePeople(event).length ? 'Niemand' : 'Iedereen'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        }
-        ListEmptyComponent={
-          <EmptyState
-            title="Nog niemand toegevoegd"
-            hint="Voeg eerst mensen toe aan dit evenement."
-          />
-        }
-        renderItem={({ item: person }) => {
-          const selected = chosen.includes(person.id);
-          return (
-            <Pressable
-              onPress={() => toggle(person.id)}
-              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-              <Card
-                style={{
-                  paddingVertical: space.md,
-                  borderColor: selected ? theme.accent : theme.border,
-                  borderWidth: selected ? 2 : 1,
-                }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                  <Text style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '600' }}>
-                    {person.name}
-                  </Text>
-                  {selected ? <CheckIcon size={26} color={theme.accent} /> : null}
-                </View>
-              </Card>
-            </Pressable>
-          );
-        }}
-      />
-
+      <OrderPicker picker={picker} people={people} menu={menu} hideAmounts={hideAmounts} />
+      {ready ? (
+        // Wat er gezet gaat worden, uitgeschreven, voor een bestelling met meer
+        // dan één drankje.
+        <Text
+          style={{
+            color: theme.textDim,
+            fontSize: 13,
+            textAlign: 'center',
+            paddingHorizontal: space.lg,
+            paddingBottom: space.sm,
+          }}>
+          {describeDrinks(drinks, menu)}
+        </Text>
+      ) : null}
     </Screen>
   );
 }

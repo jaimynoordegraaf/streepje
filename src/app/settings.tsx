@@ -253,6 +253,22 @@ export default function SettingsScreen() {
           </View>
         ) : null}
 
+        {isSyncConfigured ? (
+          <View style={{ gap: space.sm, marginTop: space.md }}>
+            <SectionTitle>Ledenlijst</SectionTitle>
+            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
+              De namen van de groep, één lijst voor alle telefoons. Aan de bar kies je er een lid uit
+              in plaats van te typen. Alleen een beheerder van de groep past hem aan.
+              {group ? '' : ' Hiervoor moet deze telefoon eerst in een groep zitten (zie Groep hierboven).'}
+            </Text>
+            <Button
+              title="Ledenlijst"
+              variant="secondary"
+              onPress={() => router.push('/ledenlijst')}
+            />
+          </View>
+        ) : null}
+
         <View style={{ gap: space.sm, marginTop: space.md }}>
           <SectionTitle>Voor nieuwe lijsten</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>

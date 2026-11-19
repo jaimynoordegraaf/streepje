@@ -26,7 +26,7 @@ import { radius, space, useTheme } from '@/theme';
 import { CheckIcon } from './icons';
 import { Button, Field } from './ui';
 
-function Backdrop({ children, onCancel }: { children: React.ReactNode; onCancel: () => void }) {
+export function Backdrop({ children, onCancel }: { children: React.ReactNode; onCancel: () => void }) {
   const theme = useTheme();
   return (
     <KeyboardAvoidingView
@@ -428,18 +428,27 @@ export function NewListModal({
 export function GuestModal({
   visible,
   hosts,
+  onTab = false,
   onCancel,
   onSubmit,
 }: {
   visible: boolean;
   /** Members at the event whom a guest could have come with. */
   hosts: Person[];
+  /**
+   * Op een lopende rekening hoort een gast altijd bij een lid, en zijn streepjes
+   * tellen bij dat lid en gaan op diens factuur. Er valt dan niets te kiezen
+   * over afrekenen, en het lid is verplicht.
+   */
+  onTab?: boolean;
   onCancel: () => void;
   onSubmit: (guest: {
     name: string;
     billing: Billing;
     guestOf: string | null;
     note: string;
+    /** Of de naam getypt is. Een naam die de app zelf bedacht ("Gast van Anne") mag dubbel. */
+    named: boolean;
   }) => void;
 }) {
   const theme = useTheme();
@@ -458,21 +467,45 @@ export function GuestModal({
 
   if (!visible) return null;
 
+  const chosenHost = hosts.find((candidate) => candidate.id === guestOf);
+  // Een gast op een rekening mag zonder naam: "Gast van Anne" is dan genoeg om
+  // hem later terug te vinden.
+  const guestName =
+    name.trim() || (onTab && chosenHost ? 'Gast van ' + chosenHost.name.split(' ')[0] : '');
+  const canSubmit = onTab ? guestOf !== null && guestName !== '' : name.trim() !== '';
+
   const submit = () => {
-    if (name.trim() === '') return;
-    onSubmit({ name: name.trim(), billing, guestOf, note: note.trim() });
+    if (!canSubmit) return;
+    onSubmit({
+      name: guestName,
+      billing: onTab ? 'invoice' : billing,
+      guestOf,
+      note: note.trim(),
+      named: name.trim() !== '',
+    });
   };
 
   const hostOptions: { id: string | null; name: string }[] = [
-    { id: null, name: 'Niemand' },
-    ...hosts.map((host) => ({ id: host.id, name: host.name })),
+    ...(onTab ? [] : [{ id: null, name: 'Niemand' }]),
+    ...hosts.map((candidate) => ({ id: candidate.id, name: candidate.name })),
   ];
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Backdrop onCancel={onCancel}>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>Gast toevoegen</Text>
-        <Field value={name} onChangeText={setName} placeholder="Naam" autoFocus />
+        {onTab && hosts.length === 0 ? (
+          <Text style={{ color: theme.textDim, fontSize: 14, lineHeight: 20 }}>
+            Een gast hoort bij een lid, en er staat nog niemand op deze lijst. Zet eerst het lid
+            erbij.
+          </Text>
+        ) : null}
+        <Field
+          value={name}
+          onChangeText={setName}
+          placeholder={onTab ? 'Naam (mag leeg)' : 'Naam'}
+          autoFocus
+        />
         <Field
           value={note}
           onChangeText={setNote}
@@ -483,20 +516,24 @@ export function GuestModal({
           die aan deze lijst meedoet kan het lezen.
         </Text>
 
-        <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>AFREKENEN</Text>
-        <Choice
-          options={[
-            { value: 'tonight', label: 'Vanavond' },
-            { value: 'invoice', label: 'Op factuur' },
-          ]}
-          value={billing}
-          onChange={setBilling}
-        />
-        <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 18 }}>
-          {billing === 'tonight'
-            ? 'Aan het eind van de avond, via Tikkie of een betaalverzoek.'
-            : 'Alleen als de gast zijn gegevens heeft achtergelaten. Geef die aan de penningmeester; ze staan niet in de app.'}
-        </Text>
+        {onTab ? null : (
+          <>
+            <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>AFREKENEN</Text>
+            <Choice
+              options={[
+                { value: 'tonight', label: 'Vanavond' },
+                { value: 'invoice', label: 'Op factuur' },
+              ]}
+              value={billing}
+              onChange={setBilling}
+            />
+            <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 18 }}>
+              {billing === 'tonight'
+                ? 'Aan het eind van de avond, via Tikkie of een betaalverzoek.'
+                : 'Alleen als de gast zijn gegevens heeft achtergelaten. Geef die aan de penningmeester; ze staan niet in de app.'}
+            </Text>
+          </>
+        )}
 
         {hosts.length > 0 ? (
           <>
@@ -524,6 +561,13 @@ export function GuestModal({
                 );
               })}
             </ScrollView>
+            {onTab ? (
+              <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 18 }}>
+                {chosenHost
+                  ? `Telt bij ${chosenHost.name} en komt op diens factuur.`
+                  : 'Kies bij wie de gast hoort. Zijn streepjes komen op de factuur van dat lid.'}
+              </Text>
+            ) : null}
           </>
         ) : null}
 
@@ -532,7 +576,7 @@ export function GuestModal({
           <Button
             title="Toevoegen"
             onPress={submit}
-            disabled={name.trim() === ''}
+            disabled={!canSubmit}
             style={{ flex: 1 }}
           />
         </View>
