@@ -33,11 +33,12 @@ import { guestsOf, guestsUnderHosts } from '@/lib/guests';
 import { formatCents } from '@/lib/money';
 import { findSameName, nameKey } from '@/lib/names';
 import { useWithPending } from '@/lib/pending';
+import { shareLine } from '@/lib/share-status';
 import { useEvent, useStore } from '@/lib/store';
 import { ANCHOR } from '@/lib/tour';
 import { useListOrder } from '@/lib/use-list-order';
 import { useRoster } from '@/lib/use-roster';
-import { useEventSync, type SyncStatus } from '@/lib/use-sync';
+import { useEventSync } from '@/lib/use-sync';
 import {
   eventInvoiceCents,
   eventOutstandingCents,
@@ -125,28 +126,6 @@ function SummaryCard({
   );
 }
 
-/**
- * Hoe het delen er voor staat, als regel tekst en als "hier moet je naar
- * kijken".
- *
- * Dit stond als balk midden in de lijst. Nu staat de regel onder Delen in het
- * menu, en `problem` zet een puntje op de drie puntjes: een lijst die niet
- * meer synchroniseert mag niet pas opvallen als iemand het menu opent.
- */
-function shareState(
-  shared: boolean,
-  status: SyncStatus,
-  pending: number,
-  unsaved: boolean
-): { label: string; problem: boolean } {
-  if (!shared) return { label: 'Alleen op deze telefoon', problem: false };
-  if (unsaved) return { label: 'Wijziging nog niet opgeslagen', problem: true };
-  if (status === 'live') return { label: 'Verbonden met de andere telefoons', problem: false };
-  if (status === 'connecting') return { label: 'Verbinden…', problem: false };
-  if (status === 'offline') return { label: 'Offline · ' + pending + ' nog te versturen', problem: true };
-  return { label: 'Gedeeld', problem: false };
-}
-
 function Badge({ label, color }: { label: string; color: string }) {
   const theme = useTheme();
   return (
@@ -219,7 +198,17 @@ export function ListScreen({ id }: { id: string }) {
   const nameOf = (personId: string | null) =>
     personId ? (event.people.find((person) => person.id === personId)?.name ?? null) : null;
 
-  const sharing = shareState(Boolean(event.share), status, pending, detailsPending);
+  // Het puntje op de drie puntjes: een lijst die te lang niet synchroniseert mag
+  // niet pas opvallen als iemand het menu opent. Gewoon offline is geen reden;
+  // zie share-status.ts.
+  const sharing = shareLine({
+    shared: Boolean(event.share),
+    status,
+    pending,
+    unsaved: detailsPending,
+    lastSyncedAt: event.share?.lastSyncedAt ?? null,
+    now: Date.now(),
+  });
 
   // De namen waaruit Lid toevoegen voorstellen doet. Zit de telefoon in een groep
   // met een ledenlijst, dan komen ze daaruit; anders uit de Vaste namen van dit
@@ -299,11 +288,11 @@ export function ListScreen({ id }: { id: string }) {
     ...adders.map((item, index) => (index === 0 ? { ...item, heading: 'Voor de bar' } : item)),
     {
       // Alles achter de beheercode staat op één pagina. Het rode puntje op de
-      // drie puntjes (sharing.problem) heeft daarmee geen eigen uitleg meer in
+      // drie puntjes (sharing.alert) heeft daarmee geen eigen uitleg meer in
       // het menu, dus die komt hier als regel onder Beheer.
       label: 'Beheer',
-      hint: sharing.problem ? sharing.label : undefined,
-      hintAlert: sharing.problem,
+      hint: sharing.alert ? sharing.label : undefined,
+      hintAlert: sharing.alert,
       heading: 'Achter de beheercode',
       onPress: () => router.push({ pathname: '/event/[id]/beheer', params: { id } }),
       locked: true,
@@ -338,7 +327,7 @@ export function ListScreen({ id }: { id: string }) {
         options={{
           title: event.name,
           headerRight: () => (
-            <MenuButton onOpen={menu.open} alert={sharing.problem} tourId={ANCHOR.menu} />
+            <MenuButton onOpen={menu.open} alert={sharing.alert} tourId={ANCHOR.menu} />
           ),
         }}
       />

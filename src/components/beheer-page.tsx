@@ -39,6 +39,7 @@ import {
   wholeEventPeriod,
 } from '@/lib/export';
 import { isAdminDevice, unlockSecondsLeft } from '@/lib/pin';
+import { shareLine } from '@/lib/share-status';
 import { useEvent, useHomeList, useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
 import { useStartTour } from '@/lib/tour';
@@ -121,13 +122,6 @@ function Pill({ label, tone }: { label: string; tone: 'plain' | 'good' | 'bad' }
   );
 }
 
-/** Hoe het delen er voor staat, uit wat er op de telefoon zelf staat. */
-function sharingLine(shared: boolean, pending: number): { label: string; alert: boolean } {
-  if (!shared) return { label: 'Alleen op deze telefoon', alert: false };
-  if (pending > 0) return { label: `Gedeeld · ${pending} nog te versturen`, alert: true };
-  return { label: 'Gedeeld met de andere telefoons', alert: false };
-}
-
 export function BeheerPage({ id }: { id?: string }) {
   const theme = useTheme();
   const router = useRouter();
@@ -175,11 +169,23 @@ export function BeheerPage({ id }: { id?: string }) {
     }
   };
 
+  // Uit wat er op de telefoon zelf staat: Beheer houdt geen verbinding bij.
+  // Wachtende turven zijn op de bar-iPad gewoon; pas na lang geen verbinding
+  // gaat het puntje aan (zie share-status.ts).
+  const sharing = event
+    ? shareLine({
+        shared: Boolean(event.share),
+        pending: event.unsyncedEntryIds.length,
+        unsaved: false,
+        lastSyncedAt: event.share?.lastSyncedAt ?? null,
+        now: Date.now(),
+      })
+    : null;
+
   const groups: Group[] = [];
 
   if (event && id) {
     const tab = event.kind === 'tab';
-    const sharing = sharingLine(Boolean(event.share), event.unsyncedEntryIds.length);
     const go =
       (
         pathname:
@@ -257,8 +263,8 @@ export function BeheerPage({ id }: { id?: string }) {
         {
           key: 'share',
           label: event.share ? 'Delen beheren' : 'Delen',
-          hint: sharing.label,
-          alert: sharing.alert,
+          hint: sharing?.label,
+          alert: sharing?.alert ?? false,
           onPress: go('/event/[id]/share'),
         },
         {
@@ -360,7 +366,13 @@ export function BeheerPage({ id }: { id?: string }) {
                 tone="plain"
               />
               {event.unsyncedEntryIds.length > 0 && event.share ? (
-                <Pill label={`${event.unsyncedEntryIds.length} nog te versturen`} tone="bad" />
+                <Pill
+                  label={`${event.unsyncedEntryIds.length} nog te versturen`}
+                  tone={sharing?.alert ? 'bad' : 'plain'}
+                />
+              ) : null}
+              {event.share && sharing?.lastContact ? (
+                <Pill label={`Laatst verbonden ${sharing.lastContact}`} tone="plain" />
               ) : null}
             </View>
             {adminCode ? (

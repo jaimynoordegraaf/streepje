@@ -9,6 +9,7 @@ import { PinModal } from '@/components/pin-modal';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { describeError } from '@/lib/errors';
 import { correctionsUnlocked, isAdminDevice, unlockCorrections } from '@/lib/pin';
+import { shareLine, STIL_DAGEN } from '@/lib/share-status';
 import { newJoinCode, useEvent, useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
 import {
@@ -238,10 +239,21 @@ export default function ShareScreen() {
             ? 'De gedeelde lijst is verwijderd. Wat op deze telefoon staat blijft staan.'
             : 'Niet gedeeld';
 
+  // Offline is op de bar-iPad de gewone toestand: geen wifi, geen simkaart, de
+  // 4G-router alleen af en toe aan. Rood alleen als er al lang iets wacht.
+  const sharing = shareLine({
+    shared: Boolean(event?.share),
+    status,
+    pending,
+    unsaved: detailsPending,
+    lastSyncedAt: event?.share?.lastSyncedAt ?? null,
+    now: Date.now(),
+  });
+
   const statusColor =
     status === 'live'
       ? theme.good
-      : status === 'offline' || status === 'gone'
+      : status === 'gone' || sharing.alert
         ? theme.danger
         : theme.textDim;
 
@@ -290,8 +302,19 @@ export default function ShareScreen() {
                   {statusLabel}
                 </Text>
               </View>
-              {detailsPending ? (
+              <Text style={{ color: theme.textDim, fontSize: 13 }}>
+                {sharing.lastContact
+                  ? `Laatst verbonden met de server: ${sharing.lastContact}.`
+                  : 'Nog nooit verbonden met de server.'}
+              </Text>
+              {sharing.alert ? (
                 <Text style={{ color: theme.danger, fontSize: 13 }}>
+                  Al meer dan {STIL_DAGEN} dagen geen verbinding, en er staat nog iets alleen op
+                  deze telefoon. Zet de router aan, dan gaat het er vanzelf uit.
+                </Text>
+              ) : null}
+              {detailsPending ? (
+                <Text style={{ color: sharing.alert ? theme.danger : theme.textDim, fontSize: 13 }}>
                   Een wijziging aan namen, prijzen of betalingen staat nog niet op de server.
                   Turfjes wachten vanzelf, maar dit soort wijzigingen wordt pas bewaard als er
                   weer verbinding is.

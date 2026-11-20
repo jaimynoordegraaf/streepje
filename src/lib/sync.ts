@@ -473,6 +473,60 @@ export async function attachToGroup(sessionId: string, groupId: string): Promise
   }
 }
 
+/** Zoveel rijen vragen we per keer; gelijk aan wat Supabase standaard toestaat. */
+const PAGE_SIZE = 1000;
+
+/**
+ * Alle rijen van één lijst uit een tabel, in stukken.
+ *
+ * De server geeft per vraag hoogstens "Max rows" rijen terug (standaard 1000,
+ * in te stellen in Supabase) en zegt er niet bij dat er meer was. Een seizoen op
+ * de lopende rekening komt daar overheen, en dan miste de telefoon die de lijst
+ * ophaalde stil de rest: een nieuwe iPad na verlies van de oude kreeg niet alle
+ * turven terug, en een telefoon die lang offline was haalde niet alles in.
+ *
+ * Daarom in stukken, gesorteerd op id, en elk volgend stuk na de laatste id van
+ * het vorige. Dat blijft kloppen als er tussendoor turven bijkomen; een turf die
+ * dan net achter ons belandt, komt bij de volgende keer ophalen of via realtime
+ * binnen. Het eerste stuk vraagt ook hoeveel er in totaal zijn, zodat een gewone
+ * lijst met één vraag klaar is, ook als "Max rows" kleiner staat dan PAGE_SIZE.
+ */
+async function fetchAllRows<Row extends { id: string }>(
+  table: 'session_people' | 'session_items' | 'order_entries',
+  sessionId: string
+): Promise<Row[]> {
+  const db = client();
+  const rows: Row[] = [];
+  let after: string | null = null;
+  let total: number | null = null;
+
+  for (let first = true; ; first = false) {
+    let query = db
+      .from(table)
+      .select('*', first ? { count: 'exact' } : undefined)
+      .eq('session_id', sessionId)
+      .order('id', { ascending: true })
+      .limit(PAGE_SIZE);
+    if (after !== null) query = query.gt('id', after);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+    if (first) total = count ?? null;
+
+    const page = (data ?? []) as Row[];
+    if (page.length === 0) break;
+    rows.push(...page);
+    if (total !== null && rows.length >= total) break;
+
+    const last = page[page.length - 1].id;
+    // Geen voortgang zou eindeloos blijven vragen. Mag niet voorkomen, maar
+    // een telefoon aan de bar die vastloopt in een lus is erger dan een gat.
+    if (last === after) break;
+    after = last;
+  }
+  return rows;
+}
+
 /** Read the whole shared event. Used when joining, and to catch up after being offline. */
 export async function fetchSession(sessionId: string): Promise<RemoteSession> {
   const db = client();
@@ -483,13 +537,12 @@ export async function fetchSession(sessionId: string): Promise<RemoteSession> {
       .select('name, kind, closed, created_at, group_id')
       .eq('id', sessionId)
       .maybeSingle(),
-    db.from('session_people').select('*').eq('session_id', sessionId),
-    db.from('session_items').select('*').eq('session_id', sessionId),
-    db.from('order_entries').select('*').eq('session_id', sessionId),
+    fetchAllRows<PersonRow>('session_people', sessionId),
+    fetchAllRows<ItemRow>('session_items', sessionId),
+    fetchAllRows<EntryRow>('order_entries', sessionId),
   ]);
 
-  const failure = session.error ?? people.error ?? items.error ?? entries.error;
-  if (failure) throw failure;
+  if (session.error) throw session.error;
   // maybeSingle rather than single: a missing row is a deleted session, which
   // is an answer, not a database error.
   if (!session.data) throw new SessionGoneError();
@@ -500,9 +553,9 @@ export async function fetchSession(sessionId: string): Promise<RemoteSession> {
     createdAt: Date.parse(session.data.created_at),
     closed: session.data.closed,
     groupId: session.data.group_id ?? null,
-    people: (people.data ?? []).map(toPerson),
-    menu: (items.data ?? []).map(toItem),
-    entries: (entries.data ?? []).map(toEntry).sort((a, b) => a.createdAt - b.createdAt),
+    people: people.map(toPerson),
+    menu: items.map(toItem),
+    entries: entries.map(toEntry).sort((a, b) => a.createdAt - b.createdAt),
   };
 }
 
