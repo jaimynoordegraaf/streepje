@@ -84,6 +84,17 @@ let lastRun = 0;
  * ronde (geen verbinding op de bar-iPad) blijft stil.
  */
 export function runUpdateCheck(manual = false): Promise<void> {
+  if (__DEV__ && manual && useUpdateFlow.getState().sim !== null) {
+    // Oefenstand: zoeken duurt even en vindt dan een update. Zo is te zien wat
+    // een tik op de rij doet.
+    useUpdateFlow.setState({ sim: 'checking' });
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        useUpdateFlow.setState({ sim: 'ready' });
+        resolve();
+      }, 1500)
+    );
+  }
   if (!enabled) return Promise.resolve();
   if (running) return running;
   const flow = useUpdateFlow.getState();
