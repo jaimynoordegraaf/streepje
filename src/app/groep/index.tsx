@@ -18,7 +18,7 @@
 
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Children, useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { useGroupPinGate } from '@/components/group-pin';
@@ -328,9 +328,30 @@ export default function GroupScreen() {
                 Groepscode, voor wie er nog bij moet
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ color: theme.text, fontSize: 28, fontWeight: '700', letterSpacing: 5 }}>
-                  {group.joinCode}
-                </Text>
+                {/* Tikken opent het deelvenster van de telefoon, met Kopiëren erin
+                    (iOS en Android) en meteen WhatsApp en dergelijke. Direct naar
+                    het klembord kan pas met expo-clipboard: native code, dus een
+                    nieuwe versie en store-builds, geen OTA. Lang drukken
+                    selecteert de tekst, dat kopieert ook. */}
+                <Pressable
+                  onPress={() => {
+                    Share.share(
+                      { message: group.joinCode },
+                      { dialogTitle: `Groepscode van ${group.name}` }
+                    ).catch(() => {});
+                  }}
+                  accessibilityRole="button"
+                  accessibilityHint="Opent het deelvenster, met Kopiëren"
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                  <Text
+                    selectable
+                    style={{ color: theme.text, fontSize: 28, fontWeight: '700', letterSpacing: 5 }}>
+                    {group.joinCode}
+                  </Text>
+                  <Text style={{ color: theme.link, fontSize: 12, fontWeight: '600' }}>
+                    Tik om te kopiëren of te delen
+                  </Text>
+                </Pressable>
                 <SmallButton title={showQr ? 'QR verbergen' : 'QR tonen'} onPress={() => setShowQr(!showQr)} />
               </View>
               {showQr ? (
