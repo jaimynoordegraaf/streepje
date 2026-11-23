@@ -17,10 +17,20 @@ import { font, space, type as typeScale, useTheme } from '@/theme';
  * Loading saved data from storage takes a moment. Until it finishes the store
  * still holds its empty starting value, so we wait rather than briefly showing
  * "no events yet" to someone who has plenty.
+ *
+ * Kijk na het aanmelden nog één keer. Het inlezen kan klaar zijn tussen de
+ * eerste render en dit effect -- met een lege opslag (een nieuwe installatie,
+ * of de testversie net leeggemaakt) gaat dat zo snel dat Android het haalt.
+ * Dan was het seintje al geweest voordat er iemand luisterde, en bleef de app
+ * voor altijd op het laadrondje staan.
  */
 function useHydrated(): boolean {
   const [hydrated, setHydrated] = useState(() => useStore.persist.hasHydrated());
-  useEffect(() => useStore.persist.onFinishHydration(() => setHydrated(true)), []);
+  useEffect(() => {
+    const unsubscribe = useStore.persist.onFinishHydration(() => setHydrated(true));
+    if (useStore.persist.hasHydrated()) setHydrated(true);
+    return unsubscribe;
+  }, []);
   return hydrated;
 }
 

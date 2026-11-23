@@ -1017,6 +1017,15 @@ export const useStore = create<StoreState>()(
        * volgende start gewoon weg, zonder dat daar iets voor hoeft te draaien
        * dat zelf ook kan falen. De rest van de staat gaat zoals altijd mee.
        */
+      /**
+       * Lukt het inlezen niet, dan blijft de app op het laadrondje staan, en
+       * dat is met opzet: verder gaan met een lege staat zou bij de eerste
+       * wijziging de echte lijsten overschrijven. Wel zeggen waarom, zodat het
+       * in de log van de ontwikkelserver staat.
+       */
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) console.warn('streepje: opslag inlezen mislukt', error);
+      },
       partialize: (state) => ({
         ...state,
         events: state.events.filter((event) => !event.demo),
