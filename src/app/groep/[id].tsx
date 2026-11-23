@@ -216,7 +216,7 @@ export default function GroupListScreen() {
       }
       try {
         const fresh = await fetchSession(event.id);
-        pullRemote(event.id, fresh);
+        pullRemote(event.id, fresh, isAdminDevice(event));
       } catch (error) {
         if (error instanceof SessionGoneError) {
           setRemote(null);
@@ -230,7 +230,11 @@ export default function GroupListScreen() {
         'Bijgewerkt',
         `${added === 0 ? 'Geen nieuwe turven.' : added === 1 ? '1 nieuwe turf.' : `${added} nieuwe turven.`}${
           rows.length > 0 ? ` ${rows.length} wachtende turven van dit toestel zijn verstuurd.` : ''
-        } Namen, prijzen en betalingen zijn alleen opgehaald, niet verstuurd.`
+        } ${
+          isAdminDevice(event)
+            ? 'Namen, prijzen en betalingen van dit toestel zijn blijven staan: dit is een beheertelefoon.'
+            : 'Namen, prijzen en betalingen zijn alleen opgehaald, niet verstuurd.'
+        }`
       );
     });
 
@@ -292,11 +296,21 @@ export default function GroupListScreen() {
   const removeHere = () => {
     if (!event) return;
     const last = gone || !shared;
+    // Turven die nog niet verstuurd zijn, staan alleen hier. Ook bij een lijst
+    // die verder gewoon op de server staat, gaan die met het weghalen verloren.
+    const waiting = event.unsyncedEntryIds.length;
+    const lost =
+      waiting === 0
+        ? ''
+        : `\n\nLet op: ${waiting === 1 ? '1 turf is' : `${waiting} turven zijn`} nog niet verstuurd en ${
+            waiting === 1 ? 'staat' : 'staan'
+          } alleen op dit toestel. Die ${waiting === 1 ? 'is' : 'zijn'} daarna weg.`;
     Alert.alert(
       `${title} van dit toestel halen?`,
-      last
+      (last
         ? 'Dit is de laatste kopie: hij staat niet (meer) op de server. Alles wat erin geturfd is, is daarna weg. Exporteer eerst als je de gegevens nog nodig hebt.'
-        : 'De lijst blijft op de server en bij de anderen staan. Je kunt hem hier later weer ophalen via Groep.',
+        : 'De lijst blijft op de server en bij de anderen staan. Je kunt hem hier later weer ophalen via Groep.') +
+        lost,
       [
         { text: 'Annuleren', style: 'cancel' },
         {
@@ -307,8 +321,9 @@ export default function GroupListScreen() {
               deleteEvent(event.id);
               router.back();
             };
-            // Wie beheerder is van de laatste kopie, haalt geld weg: met de code.
-            if (last && isAdminDevice(event)) whenAlertClosed(() => withListPin(go));
+            // Wie beheerder is en turven weggooit die nergens anders staan, haalt
+            // geld weg: met de code.
+            if ((last || waiting > 0) && isAdminDevice(event)) whenAlertClosed(() => withListPin(go));
             else go();
           },
         },

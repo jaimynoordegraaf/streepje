@@ -342,9 +342,16 @@ type StoreState = {
   /**
    * De stand van de server op dit toestel zetten, zonder iets terug te sturen.
    *
-   * Voor "Bijwerken". Namen en menu-items die de server heeft, gaan over die op
-   * dit toestel heen; wat alleen hier staat (iemand die offline is toegevoegd en
-   * nog niet verstuurd) blijft staan. Turven worden alleen aangevuld.
+   * Voor "Bijwerken". Turven worden alleen aangevuld. Wat er met namen, menu en
+   * betalingen gebeurt hangt af van `keepLocal`:
+   *
+   * - Een gewoon lid (`keepLocal` false): wat de server heeft gaat over dit
+   *   toestel heen; wat alleen hier staat blijft staan.
+   * - Een beheertelefoon (`keepLocal` true): wat hier staat wint, de server
+   *   vult alleen aan wat hier ontbreekt. Een beheertelefoon legt betalingen,
+   *   namen en prijzen vast, op de bar-iPad vaak offline. Zou de server winnen,
+   *   dan haalde één tik op Bijwerken een betaling weg die nog niet verstuurd
+   *   was. Dat versturen doet de lijst zelf (use-sync.ts), zodra hij open is.
    */
   pullRemote: (
     eventId: string,
@@ -355,7 +362,8 @@ type StoreState = {
       people: Person[];
       menu: MenuItem[];
       entries: OrderEntry[];
-    }
+    },
+    keepLocal: boolean
   ) => void;
   setShare: (eventId: string, share: ShareInfo | null) => void;
   /** Remember what the server last said about this phone being an admin. */
@@ -891,20 +899,32 @@ export const useStore = create<StoreState>()(
       setGroupPending: (eventId, groupPending) =>
         set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, groupPending })) }),
 
-      pullRemote: (eventId, remote) => {
+      pullRemote: (eventId, remote, keepLocal) => {
         const event = get().events.find((candidate) => candidate.id === eventId);
         if (!event) return;
-        const byId = <T extends { id: string }>(server: T[], local: T[]): T[] => {
-          const onServer = new Set(server.map((row) => row.id));
-          return [...server, ...local.filter((row) => !onServer.has(row.id))];
+        /** `first` wint bij een gelijk id; uit `second` komt alleen wat ontbreekt. */
+        const byId = <T extends { id: string }>(first: T[], second: T[]): T[] => {
+          const seen = new Set(first.map((row) => row.id));
+          return [...first, ...second.filter((row) => !seen.has(row.id))];
         };
-        get().mergeRemoteDetails(eventId, {
-          name: remote.name,
-          closed: remote.closed,
-          groupId: remote.groupId,
-          people: byId(remote.people, event.people),
-          menu: byId(remote.menu, event.menu),
-        });
+        get().mergeRemoteDetails(
+          eventId,
+          keepLocal
+            ? {
+                name: event.name,
+                closed: event.closed,
+                groupId: remote.groupId,
+                people: byId(event.people, remote.people),
+                menu: byId(event.menu, remote.menu),
+              }
+            : {
+                name: remote.name,
+                closed: remote.closed,
+                groupId: remote.groupId,
+                people: byId(remote.people, event.people),
+                menu: byId(remote.menu, event.menu),
+              }
+        );
         get().mergeRemoteEntries(eventId, remote.entries);
         get().noteSynced(eventId);
       },

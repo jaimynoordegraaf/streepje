@@ -455,7 +455,11 @@ export default function GroupScreen() {
                     <Row
                       key={event.id}
                       title={event.name || 'Lopende rekening'}
-                      line="Staat niet meer op de server; dit is de eigen kopie van dit toestel"
+                      line={
+                        event.unsyncedEntryIds.length > 0
+                          ? `Staat niet meer op de server; ${event.unsyncedEntryIds.length} turven staan alleen op dit toestel`
+                          : 'Staat niet meer op de server; dit is de eigen kopie van dit toestel'
+                      }
                       onPress={() => open(event.id)}
                     />
                   ))}
