@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
-import { useEffect } from 'react';
-import { View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/text';
 
@@ -8,26 +8,83 @@ import { ListScreen } from '@/components/list-screen';
 import { DropdownMenu, MenuButton, useDropdown, useGlobalItems } from '@/components/menu';
 import { Button, Screen } from '@/components/ui';
 import { useHomeList, useStore } from '@/lib/store';
+import { isSyncConfigured } from '@/lib/supabase';
 import { useStartTour, useTour } from '@/lib/tour';
 import { useGroupSync } from '@/lib/use-group-sync';
 import { space, useTheme } from '@/theme';
 
 /**
+ * De eerste keer: een toestel zonder groep en zonder lijsten.
+ *
+ * De groep is de basis van streepje, dus daar begint het: meedoen met de groep
+ * van de barploeg, of er een maken. Deelnemen aan één lijst met een eigen code
+ * bestaat niet meer. Klein eronder kan het ook zonder groep, voor een iPad die
+ * op de eerste dag geen verbinding heeft; een lijst van zo'n toestel gaat later
+ * met "Zet in de groep" alsnog de groep in.
+ */
+function WelcomeScreen({ onSkip }: { onSkip: () => void }) {
+  const theme = useTheme();
+  const router = useRouter();
+
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: 'streepje' }} />
+      <View style={{ flex: 1, justifyContent: 'center', padding: space.xl, gap: space.md }}>
+        <Text style={{ color: theme.text, fontSize: 22, fontWeight: '700', textAlign: 'center' }}>
+          Welkom bij streepje
+        </Text>
+        <Text
+          style={{
+            color: theme.textDim,
+            fontSize: 15,
+            lineHeight: 22,
+            textAlign: 'center',
+            marginBottom: space.md,
+          }}>
+          De barploeg werkt in één groep. Doe mee met de groep, dan verschijnen alle lijsten
+          vanzelf op dit toestel.
+        </Text>
+        <Button title="Meedoen met een groepscode" onPress={() => router.push('/groep/meedoen')} />
+        <Button
+          title="Groep maken"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/groep', params: { maken: '1' } })}
+        />
+        <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19, textAlign: 'center' }}>
+          Doet de groep al mee? Scan de QR op een ander toestel, bij Beheer › Groep.
+        </Text>
+        <Pressable onPress={onSkip} hitSlop={10} style={{ alignSelf: 'center', marginTop: space.lg }}>
+          <Text style={{ color: theme.link, fontSize: 14, fontWeight: '600' }}>Zonder groep beginnen</Text>
+        </Pressable>
+      </View>
+    </Screen>
+  );
+}
+
+/**
  * Een telefoon zonder lopende rekening.
  *
  * Een verse telefoon, of een die alleen evenementen heeft. Met opzet geen
- * rekening die vanzelf wordt aangemaakt: wie een groepscode scant of deelneemt
- * aan de rekening van iemand anders heeft er anders meteen een lege tweede.
- * Eén tik op de knop is genoeg om er zelf een te beginnen.
+ * rekening die vanzelf wordt aangemaakt: wie met de groep meedoet heeft er
+ * anders meteen een lege tweede naast die van de groep. Eén tik op de knop is
+ * genoeg om er zelf een te beginnen.
  */
 function NoListScreen() {
   const theme = useTheme();
   const router = useRouter();
   const eventCount = useStore((state) => state.events.filter((event) => !event.demo).length);
+  const group = useStore((state) => state.group);
   const createEvent = useStore((state) => state.createEvent);
   const { shareIntoGroup } = useGroupSync();
   const menu = useDropdown();
   const items = useGlobalItems();
+  // Alleen voor deze keer: wie "Zonder groep beginnen" kiest, krijgt de vraag
+  // bij een volgende start weer, zolang er nog niets is.
+  const [skipped, setSkipped] = useState(false);
+
+  if (isSyncConfigured && !group && eventCount === 0 && !skipped) {
+    return <WelcomeScreen onSkip={() => setSkipped(true)} />;
+  }
 
   return (
     <Screen>
@@ -50,8 +107,9 @@ function NoListScreen() {
             textAlign: 'center',
             marginBottom: space.md,
           }}>
-          Begin er een voor de gewone baravonden, waar alles op de factuur van de penningmeester
-          gaat. Of neem deel aan die van iemand anders.
+          {group
+            ? `Begin er een voor de gewone baravonden, waar alles op de factuur van de penningmeester gaat. Hij komt meteen in ${group.name}.`
+            : 'Begin er een voor de gewone baravonden, waar alles op de factuur van de penningmeester gaat.'}
         </Text>
         <Button
           title="Lopende rekening starten"
@@ -62,11 +120,13 @@ function NoListScreen() {
             void shareIntoGroup(id);
           }}
         />
-        <Button
-          title="Deelnemen met code"
-          variant="secondary"
-          onPress={() => router.push('/join')}
-        />
+        {isSyncConfigured && !group ? (
+          <Button
+            title="Meedoen met een groep"
+            variant="secondary"
+            onPress={() => router.push('/groep/meedoen')}
+          />
+        ) : null}
         {eventCount > 0 ? (
           <Button
             title={eventCount === 1 ? 'Naar je evenement' : `Naar je ${eventCount} lijsten`}

@@ -118,12 +118,7 @@ export default function ListsScreen() {
     <Screen
       footer={
         <BottomBar>
-          <Button
-            title="Deelnemen"
-            variant="secondary"
-            onPress={() => router.push('/join')}
-            style={{ flex: 1 }}
-          />
+          {/* Meedoen gaat via de groep (Beheer › Groep), niet meer per lijst. */}
           <Button title="Nieuw" onPress={newList.start} style={{ flex: 1 }} />
         </BottomBar>
       }>

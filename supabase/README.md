@@ -52,14 +52,34 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 
 `.env` is listed in `.gitignore` and will not be committed.
 
+### Later migrations
+
+`schema.sql` does not contain everything. After it, run in order the numbered
+files that came later, starting with `018-rondjes.sql` and `019-group-roster.sql`.
+`022-groep-beheer.sql` lets a group admin delete lists of the group and appoint
+other group admins. Its test is `node supabase/test/groep-beheer.mjs`.
+
+To check for group admins who left the group before 022 (they kept write access
+to the member list), paste this read-only query:
+
+```sql
+select a.group_id, a.user_id from public.group_admins a
+where not exists (select 1 from public.group_members m
+                  where m.group_id = a.group_id and m.user_id = a.user_id);
+```
+
 ## Using it
 
-On the phone that owns the event: **event -> Share -> Start sharing**. A QR
-code appears with a six-character code beneath it.
+The group is the basis. The first phone opens the app and picks **Groep maken**;
+the others pick **Meedoen met een groepscode** and scan the QR shown on the
+first phone under **Beheer -> Groep -> QR tonen** (or type the code). From then
+on every list of the group appears on every phone, and every new list goes into
+the group by itself. A list made on a phone without a connection goes in as soon
+as there is one.
 
-On the other phones: **Join** on the events list, then scan the QR (or type the
-code). The event appears with all its people, prices and orders, and from then
-on every phone sees the same running totals.
+Sharing one list with its own code no longer exists in the app. Lists that were
+shared that way keep working; under **Beheer -> Groep** their admin phone can
+put them in the group.
 
 ## What to know
 

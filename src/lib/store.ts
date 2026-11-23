@@ -162,6 +162,17 @@ type StoreState = {
    */
   group: { id: string; name: string; joinCode: string } | null;
   /**
+   * De code die op dit toestel de acties van een groepsbeheerder bewaakt: een
+   * lijst van een ander toestel verwijderen, en groepsbeheerders aanwijzen.
+   *
+   * Zoals de correctiecode van een lijst: hij blijft op dit toestel, wordt de
+   * eerste keer gekozen en gaat nooit naar de server. Die kijkt zelf of dit
+   * toestel groepsbeheerder is (022); de code houdt iemand tegen die even een
+   * telefoon van een groepsbeheerder in handen heeft. Hoort bij de groep: wie
+   * de groep verlaat, verliest hem.
+   */
+  groupPin: PinRecord | null;
+  /**
    * Of de rondleiding al een keer voorbij is gekomen.
    *
    * Hij hoort bij de telefoon en niet bij een lijst, dus hij staat hier en niet
@@ -323,8 +334,29 @@ type StoreState = {
   setDeviceName: (name: string) => void;
   /** De groep van deze telefoon, of null na het verlaten ervan. */
   setGroup: (group: { id: string; name: string; joinCode: string } | null) => void;
+  setGroupPin: (pin: PinRecord | null) => void;
   /** Onthoud dat een lijst bij een groep hoort. De server beslist dat. */
   setEventGroup: (eventId: string, groupId: string | null) => void;
+  /** Een lijst moet nog de groep in zodra er verbinding is. Zie use-group-sync.ts. */
+  setGroupPending: (eventId: string, pending: boolean) => void;
+  /**
+   * De stand van de server op dit toestel zetten, zonder iets terug te sturen.
+   *
+   * Voor "Bijwerken". Namen en menu-items die de server heeft, gaan over die op
+   * dit toestel heen; wat alleen hier staat (iemand die offline is toegevoegd en
+   * nog niet verstuurd) blijft staan. Turven worden alleen aangevuld.
+   */
+  pullRemote: (
+    eventId: string,
+    remote: {
+      name: string;
+      closed: boolean;
+      groupId: string | null;
+      people: Person[];
+      menu: MenuItem[];
+      entries: OrderEntry[];
+    }
+  ) => void;
   setShare: (eventId: string, share: ShareInfo | null) => void;
   /** Remember what the server last said about this phone being an admin. */
   setShareRole: (eventId: string, role: ShareInfo['role']) => void;
@@ -362,6 +394,7 @@ export const useStore = create<StoreState>()(
       deviceId: newId(),
       deviceName: null,
       group: null,
+      groupPin: null,
       tourSeen: false,
       homeTabId: null,
       display: 'bedragen',
@@ -840,10 +873,41 @@ export const useStore = create<StoreState>()(
 
       setDeviceName: (deviceName) => set({ deviceName: deviceName.trim() || null }),
 
-      setGroup: (group) => set({ group }),
+      // Een andere groep (of geen) neemt de code van de vorige niet mee.
+      setGroup: (group) =>
+        set(group?.id === get().group?.id ? { group } : { group, groupPin: null }),
+
+      setGroupPin: (groupPin) => set({ groupPin }),
 
       setEventGroup: (eventId, groupId) =>
-        set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, groupId })) }),
+        set({
+          events: mapEvent(get().events, eventId, (event) => ({
+            ...event,
+            groupId,
+            groupPending: groupId ? false : event.groupPending,
+          })),
+        }),
+
+      setGroupPending: (eventId, groupPending) =>
+        set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, groupPending })) }),
+
+      pullRemote: (eventId, remote) => {
+        const event = get().events.find((candidate) => candidate.id === eventId);
+        if (!event) return;
+        const byId = <T extends { id: string }>(server: T[], local: T[]): T[] => {
+          const onServer = new Set(server.map((row) => row.id));
+          return [...server, ...local.filter((row) => !onServer.has(row.id))];
+        };
+        get().mergeRemoteDetails(eventId, {
+          name: remote.name,
+          closed: remote.closed,
+          groupId: remote.groupId,
+          people: byId(remote.people, event.people),
+          menu: byId(remote.menu, event.menu),
+        });
+        get().mergeRemoteEntries(eventId, remote.entries);
+        get().noteSynced(eventId);
+      },
 
       setShare: (eventId, share) =>
         set({ events: mapEvent(get().events, eventId, (event) => ({ ...event, share })) }),

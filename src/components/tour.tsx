@@ -10,7 +10,7 @@
  * Tikken gaan niet door naar de app eronder. Dat is met opzet: de rondleiding
  * laat de echte knoppen zien, maar wie er tijdens de uitleg op drukt staat
  * ineens ergens anders dan waar de volgende stap over gaat. Bovendien zou een
- * tik op Delen de voorbeeldlijst alsnog de server op sturen, en dat is precies
+ * tik op "Zet in de groep" de voorbeeldlijst alsnog de server op sturen, en dat is precies
  * wat niet mag gebeuren.
  *
  * Wat er verteld wordt en waar het naar wijst staat in lib/tour.ts.

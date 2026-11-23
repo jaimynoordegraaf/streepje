@@ -384,6 +384,17 @@ export type GroupSession = {
   kind: ListKind;
   joinCode: string;
   createdAt: number;
+  closed: boolean;
+};
+
+/** Een toestel in de groep, zoals het Groep-scherm het laat zien. */
+export type GroupMember = {
+  userId: string;
+  /** Wat dat toestel zichzelf noemt. Leeg tot het de nieuwe versie heeft geopend. */
+  name: string | null;
+  joinedAt: number;
+  /** Groepsbeheerder: beheert de ledenlijst en mag lijsten van de groep verwijderen. */
+  admin: boolean;
 };
 
 export async function createGroup(id: string, name: string, joinCode: string): Promise<RemoteGroup> {
@@ -432,7 +443,7 @@ export async function leaveGroup(groupId: string): Promise<void> {
 export async function fetchGroupSessions(groupId: string): Promise<GroupSession[]> {
   const { data, error } = await client()
     .from('sessions')
-    .select('id, name, kind, join_code, created_at')
+    .select('id, name, kind, join_code, created_at, closed')
     .eq('group_id', groupId)
     .order('created_at', { ascending: false });
   if (error) throw error;
@@ -442,8 +453,83 @@ export async function fetchGroupSessions(groupId: string): Promise<GroupSession[
     kind: (row.kind === 'tab' ? 'tab' : 'event') as ListKind,
     joinCode: row.join_code as string,
     createdAt: Date.parse(row.created_at as string),
+    closed: Boolean(row.closed),
   }));
 }
+
+/**
+ * Eén lijst zoals de server hem kent, voor het scherm van een lijst die nog
+ * niet op dit toestel staat. Null als hij er niet (meer) is, of als dit toestel
+ * hem niet mag zien.
+ */
+export async function fetchGroupSession(sessionId: string): Promise<GroupSession | null> {
+  const { data, error } = await client()
+    .from('sessions')
+    .select('id, name, kind, join_code, created_at, closed')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    kind: (data.kind === 'tab' ? 'tab' : 'event') as ListKind,
+    joinCode: data.join_code as string,
+    createdAt: Date.parse(data.created_at as string),
+    closed: Boolean(data.closed),
+  };
+}
+
+/** Wie er in de groep zit, oudste eerst, met wie groepsbeheerder is. */
+export async function fetchGroupMembers(groupId: string): Promise<GroupMember[]> {
+  const db = client();
+  const [members, admins] = await Promise.all([
+    db.from('group_members').select('user_id, name, joined_at').eq('group_id', groupId).order('joined_at'),
+    db.from('group_admins').select('user_id').eq('group_id', groupId),
+  ]);
+  const failure = members.error ?? admins.error;
+  if (failure) throw failure;
+  const adminIds = new Set((admins.data ?? []).map((row) => row.user_id as string));
+  return (members.data ?? []).map((row) => ({
+    userId: row.user_id as string,
+    name: (row.name as string | null) || null,
+    joinedAt: Date.parse(row.joined_at as string),
+    admin: adminIds.has(row.user_id as string),
+  }));
+}
+
+/**
+ * Dit toestel een naam geven in de groep, zodat de anderen zien wie er meedoet.
+ *
+ * Een toestel mag alleen zijn eigen rij wijzigen; dat bewaakt de database
+ * (beleid group_members_name_own, uit 014).
+ */
+export async function setGroupMemberName(groupId: string, name: string): Promise<void> {
+  const userId = await ensureSignedIn();
+  const { error } = await client()
+    .from('group_members')
+    .update({ name: name.trim() })
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+/** Een toestel in de groep groepsbeheerder maken. De database kijkt wie het vraagt (022). */
+export async function addGroupAdmin(groupId: string, userId: string): Promise<void> {
+  await ensureSignedIn();
+  const { error } = await client().rpc('add_group_admin', { p_group_id: groupId, p_user_id: userId });
+  if (error) throw error;
+}
+
+/** Een groepsbeheerder intrekken. Een groep houdt er altijd minstens één (022). */
+export async function removeGroupAdmin(groupId: string, userId: string): Promise<void> {
+  await ensureSignedIn();
+  const { error } = await client().rpc('remove_group_admin', { p_group_id: groupId, p_user_id: userId });
+  if (error) throw error;
+}
+
+/** Het eigen id van dit toestel op de server, om "dit toestel" aan te wijzen. */
+export const myUserId = (): Promise<string> => ensureSignedIn();
 
 /**
  * Een bestaande gedeelde lijst bij de groep zetten.

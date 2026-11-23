@@ -282,6 +282,12 @@ export type AppEvent = {
    * beheerder en staat daarna vast.
    */
   groupId?: string | null;
+  /**
+   * Deze lijst moet nog de groep in, maar dat lukte nog niet: hij is gemaakt
+   * terwijl de bar-iPad geen verbinding had. Zodra er verbinding is, gaat hij
+   * vanzelf (zie use-group-sync.ts), in plaats van één melding en daarna niets.
+   */
+  groupPending?: boolean;
   /** Null while the event lives only on this phone. */
   share: ShareInfo | null;
   /**
@@ -301,7 +307,8 @@ export type AppEvent = {
    * opslag laat hem vallen (zie `partialize` in store.ts), en het beginscherm
    * ruimt hem op zodra er geen rondleiding meer loopt. Delen gebeurt nooit --
    * een lijst gaat pas naar de server als `share` gezet wordt, en dat gebeurt
-   * alleen op het Delen-scherm en bij een nieuwe lijst van iemand met een groep.
+   * alleen bij "Zet in de groep" en bij een nieuwe lijst van iemand met een
+   * groep (putIntoGroup in use-group-sync.ts, dat de voorbeeldlijst overslaat).
    */
   demo?: boolean;
 };

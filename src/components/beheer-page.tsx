@@ -38,6 +38,7 @@ import {
   periodsInEvent,
   wholeEventPeriod,
 } from '@/lib/export';
+import { listPlace, placeLabel } from '@/lib/group-lists';
 import { isAdminDevice, unlockSecondsLeft } from '@/lib/pin';
 import { shareLine } from '@/lib/share-status';
 import { useEvent, useHomeList, useStore } from '@/lib/store';
@@ -129,6 +130,12 @@ export function BeheerPage({ id }: { id?: string }) {
   const home = useHomeList();
   const eventCount = useStore((state) => state.events.filter((candidate) => !candidate.demo).length);
   const group = useStore((state) => state.group);
+  const groupListCount = useStore(
+    (state) =>
+      state.events.filter(
+        (candidate) => !candidate.demo && Boolean(candidate.groupId) && candidate.groupId === state.group?.id
+      ).length
+  );
   const startTour = useStartTour();
   const bottomInset = useBottomInset();
   const [busy, setBusy] = useState(false);
@@ -191,7 +198,6 @@ export function BeheerPage({ id }: { id?: string }) {
         pathname:
           | '/event/[id]/totals'
           | '/event/[id]/log'
-          | '/event/[id]/share'
           | '/event/[id]/personen'
           | '/event/[id]/menu-prijzen'
           | '/event/[id]/setup'
@@ -261,13 +267,6 @@ export function BeheerPage({ id }: { id?: string }) {
           onPress: go('/event/[id]/menu-prijzen'),
         },
         {
-          key: 'share',
-          label: event.share ? 'Delen beheren' : 'Delen',
-          hint: sharing?.label,
-          alert: sharing?.alert ?? false,
-          onPress: go('/event/[id]/share'),
-        },
-        {
           key: 'setup',
           label: 'Naam, code en afsluiten',
           hint: event.correctionPin || !isAdminDevice(event) ? undefined : 'Nog geen code ingesteld',
@@ -292,7 +291,14 @@ export function BeheerPage({ id }: { id?: string }) {
       {
         key: 'group',
         label: 'Groep',
-        hint: group ? group.name : 'Aanmaken of deelnemen',
+        // Delen is geen los begrip meer: de groep is waar de lijsten staan, dus
+        // het puntje voor "lang niets verstuurd" staat hier.
+        hint: group
+          ? `${group.name} · ${groupListCount === 1 ? '1 lijst' : `${groupListCount} lijsten`}${
+              sharing?.alert ? ` · ${sharing.label}` : ''
+            }`
+          : 'Maken of meedoen',
+        alert: Boolean(sharing?.alert),
         onPress: () => router.push('/groep'),
       },
       {
@@ -361,10 +367,7 @@ export function BeheerPage({ id }: { id?: string }) {
               ) : (
                 <Pill label="Geen beheertelefoon" tone="plain" />
               )}
-              <Pill
-                label={event.share ? 'Gedeeld' : 'Alleen op deze telefoon'}
-                tone="plain"
-              />
+              <Pill label={placeLabel(listPlace(event, group?.id ?? null))} tone="plain" />
               {event.unsyncedEntryIds.length > 0 && event.share ? (
                 <Pill
                   label={`${event.unsyncedEntryIds.length} nog te versturen`}

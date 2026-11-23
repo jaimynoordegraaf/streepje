@@ -77,7 +77,7 @@ export default function PeopleScreen() {
     if (!block.allowed && block.reason === 'not-admin') {
       Alert.alert(
         'Alleen op een beheertelefoon',
-        'Iemand verwijderen kan alleen op een telefoon die beheerder is van deze lijst. Een beheerder kan dat bij Beheer, onder Delen, instellen.'
+        'Iemand verwijderen kan alleen op een telefoon die beheerder is van deze lijst. Een beheerder van deze lijst kan dat instellen bij Beheer › Groep, onder deze lijst.'
       );
       return;
     }

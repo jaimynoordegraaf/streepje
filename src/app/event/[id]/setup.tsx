@@ -133,7 +133,7 @@ export default function SetupScreen() {
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
             {isAdminDevice(event)
               ? 'Zonder deze code kan niemand op deze telefoon een turfje weghalen. Turven zelf blijft gewoon één tik. Dezelfde code opent ook Beheer in het menu. De code staat alleen op deze telefoon, elke beheertelefoon heeft zijn eigen, en een vergeten code is niet te herstellen: schrijf hem op.'
-              : 'Turfjes weghalen kan alleen op een beheertelefoon. Op deze telefoon kun je wel turven, maar niets weghalen. Een beheerder kan deze telefoon beheerder maken bij Beheer, onder Delen.'}
+              : 'Turfjes weghalen kan alleen op een beheertelefoon. Op deze telefoon kun je wel turven, maar niets weghalen. Een beheerder van deze lijst kan deze telefoon beheerder maken bij Beheer › Groep, onder deze lijst.'}
           </Text>
 
           {isAdminDevice(event) ? (
