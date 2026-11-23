@@ -16,8 +16,8 @@
  * Wat er verteld wordt en waar het naar wijst staat in lib/tour.ts.
  */
 
-import { useNavigationContainerRef, usePathname, useRouter } from 'expo-router';
-import { ReactNode, useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'expo-router';
+import { ReactNode, useEffect } from 'react';
 import {
   BackHandler,
   Pressable,
@@ -101,22 +101,6 @@ export function TourOverlay() {
   const theme = useTheme();
   const router = useRouter();
   const pathname = usePathname();
-  const navigationRef = useNavigationContainerRef();
-  // Varen kan pas als de navigatie echt klaar is. Eerder gooit expo-router een
-  // fout ("Attempted to navigate before mounting the Root Layout component"),
-  // en die stond bij een verse start op het scherm. De sleutel van
-  // useRootNavigationState bleek daar te vroeg: hij staat er al voor de
-  // container klaar is, dus kijken we naar de container zelf.
-  const [navigationReady, setNavigationReady] = useState(() => navigationRef.isReady());
-  useEffect(() => {
-    if (navigationReady) return;
-    const check = () => {
-      if (navigationRef.isReady()) setNavigationReady(true);
-    };
-    check();
-    const timer = setInterval(check, 50);
-    return () => clearInterval(timer);
-  }, [navigationReady, navigationRef]);
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
 
@@ -141,28 +125,22 @@ export function TourOverlay() {
    * toch niet overeen met de stap, dan wordt er alsnog gevaren.
    */
   useEffect(() => {
-    if (!navigationReady || !active || !demoEventId || !demoPersonId) return;
+    if (!active || !demoEventId || !demoPersonId) return;
     const screen = STEPS[step]?.screen;
     if (!screen || pathname === pathFor(screen, demoEventId, demoPersonId)) return;
 
-    // Een mislukte vaart mag de app nooit neerhalen; het effect probeert het
-    // bij de volgende verandering opnieuw.
-    try {
-      switch (screen) {
-        case 'event':
-          router.replace({ pathname: '/event/[id]', params: { id: demoEventId } });
-          break;
-        case 'person':
-          router.replace({
-            pathname: '/event/[id]/person/[personId]',
-            params: { id: demoEventId, personId: demoPersonId },
-          });
-          break;
-      }
-    } catch {
-      // Zie hierboven.
+    switch (screen) {
+      case 'event':
+        router.replace({ pathname: '/event/[id]', params: { id: demoEventId } });
+        break;
+      case 'person':
+        router.replace({
+          pathname: '/event/[id]/person/[personId]',
+          params: { id: demoEventId, personId: demoPersonId },
+        });
+        break;
     }
-  }, [navigationReady, active, step, demoEventId, demoPersonId, pathname, router]);
+  }, [active, step, demoEventId, demoPersonId, pathname, router]);
 
   /**
    * De terugknop van Android doet tijdens de rondleiding niets.
@@ -189,11 +167,7 @@ export function TourOverlay() {
     // nog geen is), dat de voorbeeldlijst opruimt zodra het ziet
     // dat er geen rondleiding meer loopt. Opruimen vanaf hier zou een scherm
     // van die lijst in zijn laatste beeldjes "bestaat niet meer" laten zeggen.
-    try {
-      router.replace('/');
-    } catch {
-      // Het beginscherm staat er al; de rondleiding is wel gestopt.
-    }
+    router.replace('/');
   };
 
   const last = step === STEPS.length - 1;
