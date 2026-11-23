@@ -16,7 +16,7 @@
  * Wat er verteld wordt en waar het naar wijst staat in lib/tour.ts.
  */
 
-import { usePathname, useRouter } from 'expo-router';
+import { usePathname, useRootNavigationState, useRouter } from 'expo-router';
 import { ReactNode, useEffect } from 'react';
 import {
   BackHandler,
@@ -101,6 +101,8 @@ export function TourOverlay() {
   const theme = useTheme();
   const router = useRouter();
   const pathname = usePathname();
+  // Varen kan pas als de navigatie klaar is; eerder is een fout (zie het effect hieronder).
+  const navigationReady = useRootNavigationState()?.key != null;
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
 
@@ -125,7 +127,7 @@ export function TourOverlay() {
    * toch niet overeen met de stap, dan wordt er alsnog gevaren.
    */
   useEffect(() => {
-    if (!active || !demoEventId || !demoPersonId) return;
+    if (!navigationReady || !active || !demoEventId || !demoPersonId) return;
     const screen = STEPS[step]?.screen;
     if (!screen || pathname === pathFor(screen, demoEventId, demoPersonId)) return;
 
@@ -140,7 +142,7 @@ export function TourOverlay() {
         });
         break;
     }
-  }, [active, step, demoEventId, demoPersonId, pathname, router]);
+  }, [navigationReady, active, step, demoEventId, demoPersonId, pathname, router]);
 
   /**
    * De terugknop van Android doet tijdens de rondleiding niets.
