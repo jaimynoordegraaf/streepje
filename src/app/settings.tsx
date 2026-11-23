@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/text';
 
+import { DevReset } from '@/components/dev-reset';
 import { Choice, PromptModal } from '@/components/modals';
 import { PinModal } from '@/components/pin-modal';
 import { Button, Card, Screen, SectionTitle, useBottomInset } from '@/components/ui';
@@ -138,16 +139,18 @@ export default function SettingsScreen() {
         <View style={{ gap: space.xs, marginTop: space.md }}>
           <SectionTitle>Over je gegevens</SectionTitle>
           <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 19 }}>
-            Zolang je een evenement niet deelt, blijft alles alleen op deze telefoon staan. Deel je
-            het wel, dan worden de bestellingen op de server bewaard zodat andere telefoons ze
-            kunnen zien. Exporteer een evenement naar CSV voordat je het verwijdert: verwijderen
-            kan niet ongedaan worden gemaakt.
+            Zolang een lijst niet in een groep zit, blijft alles alleen op deze telefoon staan.
+            Zit hij wel in een groep, dan worden de bestellingen op de server bewaard zodat de
+            andere toestellen van de groep ze kunnen zien. Exporteer een lijst voordat je hem
+            verwijdert: verwijderen kan niet ongedaan worden gemaakt.
           </Text>
         </View>
 
         <Text style={{ color: theme.textDim, fontSize: 12, textAlign: 'center', marginTop: space.md }}>
           {versionLine()}
         </Text>
+
+        <DevReset />
       </ScrollView>
 
       <PinModal
