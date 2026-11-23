@@ -28,6 +28,7 @@ import { NameSuggestModal, type NameCandidate } from '@/components/name-suggest'
 import { askAboutSameName } from '@/components/same-name';
 import { Tally } from '@/components/tally';
 import { TourTarget } from '@/components/tour';
+import { UpdateBar } from '@/components/update-bar';
 import { BottomBar, Button, Card, EmptyState, Screen } from '@/components/ui';
 import { guestsOf, guestsUnderHosts, isEventMember } from '@/lib/guests';
 import { formatCents } from '@/lib/money';
@@ -302,6 +303,9 @@ export function ListScreen({ id }: { id: string }) {
   return (
     <Screen
       footer={
+        <>
+        {/* Boven de knoppen, in de indeling: de namen schuiven er niet door. */}
+        <UpdateBar />
         <BottomBar>
           {/* Eén vlak voor de rondleiding, zodat hij naar de twee knoppen
               samen kan wijzen. */}
@@ -322,6 +326,7 @@ export function ListScreen({ id }: { id: string }) {
             />
           </TourTarget>
         </BottomBar>
+        </>
       }>
       <Stack.Screen
         options={{

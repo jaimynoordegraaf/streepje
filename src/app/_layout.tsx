@@ -11,6 +11,7 @@ import { UndoStrip } from '@/components/undo-strip';
 import { noteTouch } from '@/lib/beheer';
 import { flushPendingAfterStart, usePending } from '@/lib/pending';
 import { useStore } from '@/lib/store';
+import { useAutoUpdateCheck } from '@/lib/updates';
 import { font, space, type as typeScale, useTheme } from '@/theme';
 
 /**
@@ -77,6 +78,8 @@ export default function RootLayout() {
   const scheme = useColorScheme();
   const hydrated = useHydrated();
   useSettlePending(hydrated);
+  // Zoekt zelf naar een update; het balkje en de rij onder Beheer tonen de uitkomst.
+  useAutoUpdateCheck();
   // Each face is required by its exact path. Importing from the package index
   // instead pulls in all 18 weights and italics, and a single unresolved file
   // among them takes down the whole bundle.

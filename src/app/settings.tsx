@@ -4,7 +4,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/text';
 
-import { DevReset } from '@/components/dev-reset';
+import { DevReset, DevUpdateSim } from '@/components/dev-reset';
 import { Choice, PromptModal } from '@/components/modals';
 import { PinModal } from '@/components/pin-modal';
 import { Button, Card, Screen, SectionTitle, useBottomInset } from '@/components/ui';
@@ -150,6 +150,7 @@ export default function SettingsScreen() {
           {versionLine()}
         </Text>
 
+        <DevUpdateSim />
         <DevReset />
       </ScrollView>
 

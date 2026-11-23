@@ -8,6 +8,7 @@ import { ListScreen } from '@/components/list-screen';
 import { useNewList } from '@/components/new-list';
 import { DropdownMenu, MenuButton, useDropdown, useGlobalItems } from '@/components/menu';
 import { Button, Screen } from '@/components/ui';
+import { UpdateBar } from '@/components/update-bar';
 import { useHomeList, useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
 import { useStartTour, useTour } from '@/lib/tour';
@@ -89,7 +90,7 @@ function NoListScreen() {
   }
 
   return (
-    <Screen>
+    <Screen footer={<UpdateBar bottom />}>
       <Stack.Screen
         options={{
           title: 'streepje',

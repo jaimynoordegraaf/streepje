@@ -44,6 +44,7 @@ import { shareLine } from '@/lib/share-status';
 import { useEvent, useHomeList, useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
 import { useStartTour } from '@/lib/tour';
+import { updateLines, useAppUpdate } from '@/lib/updates';
 import { radius, space, useTheme } from '@/theme';
 
 type Row = {
@@ -137,6 +138,7 @@ export function BeheerPage({ id }: { id?: string }) {
       ).length
   );
   const startTour = useStartTour();
+  const update = useAppUpdate();
   const bottomInset = useBottomInset();
   const [busy, setBusy] = useState(false);
   const [choosingPeriod, setChoosingPeriod] = useState(false);
@@ -338,6 +340,17 @@ export function BeheerPage({ id }: { id?: string }) {
       onPress: () => router.push('/lists'),
     });
   }
+  device.push({
+    key: 'update',
+    label: 'Zoeken naar updates',
+    hint: updateLines(update.status, update.checked),
+    onPress: () => {
+      // Een tik zoekt meteen; staat er al een update klaar, dan gebruikt hij die.
+      // Bezig of uit (ontwikkelversie): niets, en ook geen fout.
+      if (update.status === 'ready') void update.apply();
+      else if (update.status === 'idle' || update.status === 'error') void update.check();
+    },
+  });
   groups.push({
     title: 'Dit toestel',
     subtitle: 'Geldt voor alle lijsten',

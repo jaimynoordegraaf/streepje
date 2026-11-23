@@ -21,6 +21,7 @@ import { Button } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import { isSyncConfigured } from '@/lib/supabase';
 import { leaveGroup } from '@/lib/sync';
+import { useUpdateFlow, type UpdateStatus } from '@/lib/updates';
 import { space, useTheme } from '@/theme';
 
 export function DevReset() {
@@ -66,6 +67,46 @@ export function DevReset() {
       />
       <Text style={{ color: theme.textDim, fontSize: 12, textAlign: 'center' }}>
         Alleen in de ontwikkelversie
+      </Text>
+    </View>
+  );
+}
+
+/** De standen die "Update-balkje oefenen" na elkaar laat zien; null is de echte stand. */
+const SIM_STEPS: (UpdateStatus | null)[] = [null, 'idle', 'checking', 'downloading', 'ready', 'error'];
+const SIM_NAMES: Record<UpdateStatus, string> = {
+  off: 'uit',
+  idle: 'nieuwste versie',
+  checking: 'bezig met zoeken',
+  downloading: 'wordt opgehaald',
+  ready: 'nieuwe versie klaar',
+  error: 'zoeken lukte niet',
+};
+
+/**
+ * Alleen in de ontwikkelversie: het update-balkje en de rij onder Beheer in alle
+ * standen bekijken. In de ontwikkelversie staan updates uit, dus er is anders
+ * nooit iets te zien. Een tik op Nu bijwerken herlaadt dan niets. Zie
+ * lib/updates.ts.
+ */
+export function DevUpdateSim() {
+  const theme = useTheme();
+  const sim = useUpdateFlow((state) => state.sim);
+
+  if (!__DEV__) return null;
+
+  const next = SIM_STEPS[(SIM_STEPS.indexOf(sim) + 1) % SIM_STEPS.length];
+
+  return (
+    <View style={{ gap: space.xs, marginTop: space.md }}>
+      <Button
+        title="Update-balkje oefenen"
+        variant="secondary"
+        onPress={() => useUpdateFlow.setState({ sim: next })}
+      />
+      <Text style={{ color: theme.textDim, fontSize: 12, textAlign: 'center' }}>
+        {sim ? `Stand: ${SIM_NAMES[sim]}. Tik voor de volgende.` : 'Echte stand. Tik om te oefenen.'}{' '}
+        Alleen in de ontwikkelversie.
       </Text>
     </View>
   );

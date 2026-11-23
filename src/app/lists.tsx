@@ -5,6 +5,7 @@ import { FlatList, Pressable, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { useNewList } from '@/components/new-list';
+import { UpdateBar } from '@/components/update-bar';
 import { BottomBar, Button, Card, EmptyState, HeaderButton, Screen } from '@/components/ui';
 import { formatDate } from '@/lib/export';
 import { formatCents } from '@/lib/money';
@@ -117,10 +118,13 @@ export default function ListsScreen() {
   return (
     <Screen
       footer={
-        <BottomBar>
-          {/* Meedoen gaat via de groep (Beheer › Groep), niet meer per lijst. */}
-          <Button title="Nieuw" onPress={newList.start} style={{ flex: 1 }} />
-        </BottomBar>
+        <>
+          <UpdateBar />
+          <BottomBar>
+            {/* Meedoen gaat via de groep (Beheer › Groep), niet meer per lijst. */}
+            <Button title="Nieuw" onPress={newList.start} style={{ flex: 1 }} />
+          </BottomBar>
+        </>
       }>
       <Stack.Screen
         options={{
