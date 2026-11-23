@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { ListScreen } from '@/components/list-screen';
+import { useNewList } from '@/components/new-list';
 import { DropdownMenu, MenuButton, useDropdown, useGlobalItems } from '@/components/menu';
 import { Button, Screen } from '@/components/ui';
 import { useHomeList, useStore } from '@/lib/store';
@@ -76,6 +77,7 @@ function NoListScreen() {
   const group = useStore((state) => state.group);
   const createEvent = useStore((state) => state.createEvent);
   const { shareIntoGroup } = useGroupSync();
+  const newList = useNewList();
   const menu = useDropdown();
   const items = useGlobalItems();
   // Alleen voor deze keer: wie "Zonder groep beginnen" kiest, krijgt de vraag
@@ -120,6 +122,10 @@ function NoListScreen() {
             void shareIntoGroup(id);
           }}
         />
+        {/* Zonder lijst bestaat Alle lijsten (met Nieuw) nog niet, dus zonder
+            deze knop kon een toestel zonder rekening geen evenement maken. Gaat
+            via dezelfde weg als Nieuw: meteen in de groep, en daarna open. */}
+        <Button title="Evenement maken" variant="secondary" onPress={newList.start} />
         {isSyncConfigured && !group ? (
           <Button
             title="Meedoen met een groep"
@@ -137,6 +143,7 @@ function NoListScreen() {
       </View>
 
       <DropdownMenu top={menu.top} items={items} onClose={menu.close} />
+      {newList.modal}
     </Screen>
   );
 }
