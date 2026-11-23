@@ -11,6 +11,17 @@
 
 import type { AppEvent, Person } from './types';
 
+/**
+ * Is deze persoon op een evenement een lid, en geen gast?
+ *
+ * Een lid kwam eerst uit de lopende rekening op dit toestel (`memberId`). Nu
+ * komt hij uit de ledenlijst van de groep (`rosterId`). Allebei tellen: een
+ * evenement van vóór de ledenlijst heeft alleen het eerste.
+ */
+export function isEventMember(person: Person): boolean {
+  return person.memberId !== null || Boolean(person.rosterId);
+}
+
 /** Is deze persoon een gast die bij een lid op de lijst staat? */
 export function isGuestOfMember(event: AppEvent, person: Person, members: Person[]): boolean {
   return (

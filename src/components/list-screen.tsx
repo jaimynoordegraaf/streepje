@@ -23,13 +23,13 @@ import {
   type DropdownItem,
 } from '@/components/menu';
 import { BellIcon } from '@/components/bell';
-import { GuestModal, MemberPickerModal } from '@/components/modals';
+import { GuestModal, MemberPickerModal, SavedPeoplePickerModal } from '@/components/modals';
 import { NameSuggestModal, type NameCandidate } from '@/components/name-suggest';
 import { askAboutSameName } from '@/components/same-name';
 import { Tally } from '@/components/tally';
 import { TourTarget } from '@/components/tour';
 import { BottomBar, Button, Card, EmptyState, Screen } from '@/components/ui';
-import { guestsOf, guestsUnderHosts } from '@/lib/guests';
+import { guestsOf, guestsUnderHosts, isEventMember } from '@/lib/guests';
 import { formatCents } from '@/lib/money';
 import { findSameName, nameKey } from '@/lib/names';
 import { useWithPending } from '@/lib/pending';
@@ -530,7 +530,7 @@ export function ListScreen({ id }: { id: string }) {
         hosts={
           tab
             ? people.filter((person) => person.guestOf === null)
-            : people.filter((person) => person.memberId !== null)
+            : people.filter(isEventMember)
         }
         onTab={tab}
         onCancel={() => setAdding(null)}
@@ -548,8 +548,29 @@ export function ListScreen({ id }: { id: string }) {
         }}
       />
 
+      {/* Leden op een evenement komen uit de ledenlijst van de groep, met een
+          filter per speltak. Zonder ledenlijst (geen groep, of nog leeg) zoals
+          het was: uit de lopende rekening op dit toestel. */}
+      <SavedPeoplePickerModal
+        visible={adding === 'members' && fromRoster}
+        people={rosterMembers}
+        sections={roster?.sections ?? []}
+        alreadyIn={event.people.map((person) => person.name)}
+        onCancel={() => setAdding(null)}
+        onSubmit={(names) => {
+          // Namen zijn uniek in de ledenlijst (de database dwingt dat af), dus
+          // terug naar het lid op naam is hier veilig.
+          const wanted = new Set(names.map(nameKey));
+          addRosterPeople(
+            id,
+            rosterMembers.filter((member) => wanted.has(nameKey(member.name)))
+          );
+          setAdding(null);
+        }}
+      />
+
       <MemberPickerModal
-        visible={adding === 'members'}
+        visible={adding === 'members' && !fromRoster}
         tabs={tabs}
         alreadyIn={event.people.flatMap((person) => (person.memberId ? [person.memberId] : []))}
         onCancel={() => setAdding(null)}

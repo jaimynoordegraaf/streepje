@@ -19,6 +19,7 @@ import { PinModal } from '@/components/pin-modal';
 import { askAboutSameName } from '@/components/same-name';
 import { Button, Card, EmptyState, Screen, SectionTitle, useBottomInset } from '@/components/ui';
 import { correctionBlock, correctionsUnlocked, isAdminDevice, unlockCorrections } from '@/lib/pin';
+import { isEventMember } from '@/lib/guests';
 import { findSameName } from '@/lib/names';
 import { useEvent, useStore } from '@/lib/store';
 import { formatDateTime } from '@/lib/export';
@@ -159,7 +160,7 @@ export default function PeopleScreen() {
                             marginTop: 2,
                           }}>
                           {person.billing === 'invoice' ? 'Op factuur' : 'Betaalt vanavond'}
-                          {person.memberId ? ' · lid' : ''}
+                          {isEventMember(person) ? ' · lid' : ''}
                         </Text>
                       </Pressable>
                     ) : null}
@@ -167,10 +168,10 @@ export default function PeopleScreen() {
                   <Pressable onPress={() => setRenamingPerson(person)} hitSlop={8}>
                     <Text style={{ color: theme.link, fontWeight: '600' }}>Hernoemen</Text>
                   </Pressable>
-                  {/* Alleen voor gasten: bij een lid staat de naam al vast in
-                      de lopende rekening, en die hoort bij de penningmeester
-                      thuis onder zijn eigen naam. */}
-                  {person.memberId === null ? (
+                  {/* Op een evenement alleen voor gasten: bij een lid staat de
+                      naam al vast in de ledenlijst of de lopende rekening, en
+                      die hoort bij de penningmeester thuis onder zijn eigen naam. */}
+                  {event.kind === 'tab' || !isEventMember(person) ? (
                     <Pressable onPress={() => setNotingPerson(person)} hitSlop={8}>
                       <Text style={{ color: theme.link, fontWeight: '600' }}>Toevoeging</Text>
                     </Pressable>
